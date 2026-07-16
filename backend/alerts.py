@@ -139,6 +139,22 @@ def trigger_alert(db_id, db_name, alert_type, severity, message, details=None, i
                 f"• Connections Max: {details.get('max_connections')}\n"
                 f"• Usage: {details.get('usage_percent')}%"
             )
+        elif alert_type == "replication_lag":
+            if details.get("standby_ip"):
+                text_message += (
+                    f"\n\n<b>Details:</b>\n"
+                    f"• Standby IP: {details.get('standby_ip')}\n"
+                    f"• App Name: {details.get('application_name')}\n"
+                    f"• State: {details.get('state')}\n"
+                    f"• Sync State: {details.get('sync_state')}\n"
+                    f"• Lag: {details.get('lag_mb')} MB"
+                )
+            else:
+                text_message += (
+                    f"\n\n<b>Details:</b>\n"
+                    f"• Delay: {details.get('replica_lag_seconds')} seconds\n"
+                    f"• Last Replay: {details.get('last_replay_timestamp')}"
+                )
 
     # Dispatch alerts
     # A. Telegram

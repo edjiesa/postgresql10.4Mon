@@ -82,6 +82,36 @@ async def check_and_alert_db(db):
                 item_key=f"lock_{blocked_pid}_{blocking_pid}"
             )
             
+        # 4. Replication Lag Alerts
+        rep_stats = metrics.get("replication_stats")
+        if rep_stats:
+            if rep_stats.get("is_replica"):
+                lag_seconds = rep_stats.get("replica_lag_seconds", 0.0)
+                if lag_seconds > 60:
+                    alerts.trigger_alert(
+                        db_id=db_id,
+                        db_name=db_name,
+                        alert_type="replication_lag",
+                        severity="warning",
+                        message=f"Replication delay is high: replica is {lag_seconds} seconds behind primary.",
+                        details={"replica_lag_seconds": lag_seconds, "last_replay_timestamp": rep_stats.get("last_replay_timestamp")},
+                        item_key="rep_lag_replica"
+                    )
+            else:
+                for client in rep_stats.get("standby_clients", []):
+                    lag_mb = client.get("lag_mb", 0.0)
+                    standby_ip = client.get("standby_ip") or "unknown"
+                    if lag_mb > 50.0:
+                        alerts.trigger_alert(
+                            db_id=db_id,
+                            db_name=db_name,
+                            alert_type="replication_lag",
+                            severity="warning",
+                            message=f"Replication standby client ({standby_ip}) is lagging by {lag_mb} MB.",
+                            details=client,
+                            item_key=f"rep_lag_{standby_ip}"
+                        )
+                        
     except Exception as e:
         logger.error(f"Failed to query metrics for database '{db_name}' (ID: {db_id}): {e}")
         # Cache failure state
