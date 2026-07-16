@@ -67,7 +67,7 @@ This is the easiest way to deploy the application on your server. Docker Compose
 4. **Access the application**:
    Open your browser and navigate to: **`http://<your-server-ip>:8000`**
 
-*Note: The application configuration database is persistent on the host at `/opt/postgresql10.4Mon/pgdata` to preserve your database connections and settings.*
+*Note: The application configuration database is persistent under the Docker named volume pg-mon-db-data to preserve your database connections and settings.*
 
 ---
 

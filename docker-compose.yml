@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: pgmon_user
       POSTGRES_PASSWORD: pgmon_password123
     volumes:
-      - /opt/postgresql10.4Mon/pgdata:/var/lib/postgresql/data
+      - pg-mon-db-data:/var/lib/postgresql/data
     restart: always
     ports:
       - "54321:5432"
@@ -29,3 +29,7 @@ services:
       - APP_DB_USER=pgmon_user
       - APP_DB_PASS=pgmon_password123
       - PYTHONUNBUFFERED=1
+
+volumes:
+  pg-mon-db-data:
+    driver: local
