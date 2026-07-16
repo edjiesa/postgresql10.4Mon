@@ -15,11 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 
-# Create a folder for SQLite persistent storage
-RUN mkdir -p /app/data
-
 # Configure environment variables
-ENV DATABASE_PATH=/app/data/postgresql_mon.db
+ENV APP_DB_HOST=localhost
+ENV APP_DB_PORT=5432
+ENV APP_DB_NAME=pg_mon
+ENV APP_DB_USER=pg_mon
+ENV APP_DB_PASS=pg_mon_pass
 ENV PYTHONUNBUFFERED=1
 
 # Expose server port
