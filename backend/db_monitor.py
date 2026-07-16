@@ -52,6 +52,9 @@ def check_db_metrics(db_config):
         "slow_queries": [],
         "active_queries": [],
         "blocking_queries": [],
+        "host_system_stats": None,
+        "temp_files": 0,
+        "temp_bytes": 0,
         "timestamp": time.time()
     }
     
@@ -76,6 +79,72 @@ def check_db_metrics(db_config):
                     metrics["max_connections"] = row.get("max_connections", 100)
             except Exception as e:
                 logger.warning(f"Error querying connection stats: {e}")
+
+            # 1b. Temp files and bytes
+            try:
+                cur.execute("""
+                    SELECT 
+                        COALESCE(sum(temp_files), 0) AS temp_files,
+                        COALESCE(sum(temp_bytes), 0) AS temp_bytes
+                    FROM pg_stat_database
+                    WHERE datname = current_database();
+                """)
+                row = cur.fetchone()
+                if row:
+                    metrics["temp_files"] = int(row.get("temp_files", 0))
+                    metrics["temp_bytes"] = int(row.get("temp_bytes", 0))
+            except Exception as e:
+                logger.warning(f"Error querying database temp files: {e}")
+
+            # 1c. EDB system_stats (Host CPU, RAM, Disk) if extension is installed
+            try:
+                cur.execute("SELECT 1 FROM pg_extension WHERE extname = 'system_stats';")
+                has_sys_stats = cur.fetchone()
+                if has_sys_stats:
+                    host_stats = {
+                        "cpu": None,
+                        "ram": None,
+                        "disk": None
+                    }
+                    
+                    # Query CPU
+                    try:
+                        cur.execute("SELECT load_avg_one_minute, load_avg_five_minutes, load_avg_fifteen_minutes FROM pg_sys_cpu_info();")
+                        cpu_row = cur.fetchone()
+                        if cpu_row:
+                            host_stats["cpu"] = {
+                                "load_1m": float(cpu_row.get("load_avg_one_minute") or 0.0),
+                                "load_5m": float(cpu_row.get("load_avg_five_minutes") or 0.0),
+                                "load_15m": float(cpu_row.get("load_avg_fifteen_minutes") or 0.0)
+                            }
+                    except Exception as e:
+                        logger.debug(f"Error querying remote CPU stats: {e}")
+                        
+                    # Query RAM
+                    try:
+                        cur.execute("SELECT total_memory, free_memory, used_memory FROM pg_sys_memory_info();")
+                        mem_row = cur.fetchone()
+                        if mem_row:
+                            host_stats["ram"] = {
+                                "total": mem_row.get("total_memory") or 0,
+                                "free": mem_row.get("free_memory") or 0,
+                                "used": mem_row.get("used_memory") or 0
+                            }
+                    except Exception as e:
+                        logger.debug(f"Error querying remote RAM stats: {e}")
+                        
+                    # Query Disk
+                    try:
+                        cur.execute("SELECT mount_point, total_space, used_space, free_space FROM pg_sys_disk_info();")
+                        disk_rows = cur.fetchall()
+                        if disk_rows:
+                            host_stats["disk"] = [dict(r) for r in disk_rows]
+                    except Exception as e:
+                        logger.debug(f"Error querying remote Disk stats: {e}")
+                        
+                    metrics["host_system_stats"] = host_stats
+            except Exception as e:
+                logger.warning(f"Error checking or querying system_stats extension: {e}")
 
             # 2. Cache Hit Ratio
             try:

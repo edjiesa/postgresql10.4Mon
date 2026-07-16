@@ -33,6 +33,39 @@
             </nav>
             <div class="sidebar-footer">
                 <p>Status: <span class="status-dot online"></span> Running</p>
+                <div class="system-resources" style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
+                    <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; color: var(--color-primary);">Monitor Host Resources</div>
+                    
+                    <div class="sys-metric" style="margin-bottom: 0.65rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.2rem;">
+                            <span>CPU</span>
+                            <span id="sys-cpu-val">-</span>
+                        </div>
+                        <div class="meter-bar-container" style="height: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 3px;">
+                            <div id="sys-cpu-bar" class="meter-bar-fill" style="width: 0%; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="sys-metric" style="margin-bottom: 0.65rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.2rem;">
+                            <span>RAM</span>
+                            <span id="sys-ram-val">-</span>
+                        </div>
+                        <div class="meter-bar-container" style="height: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 3px;">
+                            <div id="sys-ram-bar" class="meter-bar-fill" style="width: 0%; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="sys-metric">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.2rem;">
+                            <span>Disk (<span id="sys-disk-drive">-</span>)</span>
+                            <span id="sys-disk-val">-</span>
+                        </div>
+                        <div class="meter-bar-container" style="height: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 3px;">
+                            <div id="sys-disk-bar" class="meter-bar-fill" style="width: 0%; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
 
@@ -295,6 +328,46 @@
                     <div class="metric-mini-card glass">
                         <span class="card-label">Index Hit Ratio</span>
                         <span class="card-value" id="detail-val-index">-</span>
+                    </div>
+                </div>
+
+                <!-- Storage & Host OS Section -->
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 2rem;">
+                    <!-- Database Storage Pressure Card -->
+                    <div class="settings-card glass" style="border: 1px solid var(--glass-border); padding: 1.25rem;">
+                        <h4 style="font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--color-primary);">💾 Storage Pressure Stats</h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">Temp Files Count</div>
+                                <div style="font-size: 1rem; font-weight: 600;" id="detail-val-temp-files">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">Temp Space Written</div>
+                                <div style="font-size: 1rem; font-weight: 600;" id="detail-val-temp-bytes">0 B</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Remote Host CPU/RAM/Disk (Dynamic) -->
+                    <div class="settings-card glass" id="detail-host-os-card" style="border: 1px solid var(--glass-border); padding: 1.25rem; display: flex; flex-direction: column;">
+                        <h4 style="font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--color-primary);">🖥️ Remote Host OS Stats</h4>
+                        <div id="detail-host-os-stats" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; flex-grow: 1; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">CPU Load (1m/5m/15m)</div>
+                                <div style="font-size: 0.95rem; font-weight: 600;" id="detail-val-remote-cpu">-</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">RAM (Used/Total)</div>
+                                <div style="font-size: 0.95rem; font-weight: 600;" id="detail-val-remote-ram">-</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Disk Space (Used/Total)</div>
+                                <div style="font-size: 0.95rem; font-weight: 600;" id="detail-val-remote-disk">-</div>
+                            </div>
+                        </div>
+                        <div id="detail-host-os-fallback" style="display: none; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; justify-content: center; align-items: center; flex-grow: 1;">
+                            <span>💡 Untuk memantau RAM & Disk host remote secara langsung lewat SQL, pasang ekstensi <code style="background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 2px;">system_stats</code> di database PostgreSQL Anda.</span>
+                        </div>
                     </div>
                 </div>
 

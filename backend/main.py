@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend import config, db_monitor, alerts
+from backend import config, db_monitor, alerts, system_monitor
 
 # Logger configuration
 logging.basicConfig(
@@ -331,6 +331,13 @@ async def api_clear_logs():
         return {"message": "Alert logs cleared."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/system/metrics")
+async def api_get_system_metrics():
+    res = system_monitor.get_system_metrics()
+    if res.get("status") == "error":
+        raise HTTPException(status_code=500, detail=res.get("message"))
+    return res
 
 # --- Serve Static Frontend Files ---
 
