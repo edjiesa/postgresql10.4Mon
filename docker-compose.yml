@@ -5,9 +5,9 @@ services:
     image: postgres:15-alpine
     container_name: pg-mon-db
     environment:
-      POSTGRES_DB: pg_mon
-      POSTGRES_USER: pg_mon
-      POSTGRES_PASSWORD: pg_mon_password123
+      POSTGRES_DB: pgmon_db
+      POSTGRES_USER: pgmon_user
+      POSTGRES_PASSWORD: pgmon_password123
     volumes:
       - /opt/postgresql10.4Mon:/var/lib/postgresql/data
     restart: always
@@ -25,7 +25,7 @@ services:
     environment:
       - APP_DB_HOST=pg-mon-db
       - APP_DB_PORT=5432
-      - APP_DB_NAME=pg_mon
-      - APP_DB_USER=pg_mon
-      - APP_DB_PASS=pg_mon_password123
+      - APP_DB_NAME=pgmon_db
+      - APP_DB_USER=pgmon_user
+      - APP_DB_PASS=pgmon_password123
       - PYTHONUNBUFFERED=1

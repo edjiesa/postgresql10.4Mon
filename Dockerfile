@@ -18,9 +18,9 @@ COPY frontend/ ./frontend/
 # Configure environment variables
 ENV APP_DB_HOST=localhost
 ENV APP_DB_PORT=5432
-ENV APP_DB_NAME=pg_mon
-ENV APP_DB_USER=pg_mon
-ENV APP_DB_PASS=pg_mon_pass
+ENV APP_DB_NAME=pgmon_db
+ENV APP_DB_USER=pgmon_user
+ENV APP_DB_PASS=pgmon_password123
 ENV PYTHONUNBUFFERED=1
 
 # Expose server port

@@ -11,9 +11,9 @@ def get_db_connection():
     """
     host = os.environ.get("APP_DB_HOST", "localhost")
     port = os.environ.get("APP_DB_PORT", "5432")
-    dbname = os.environ.get("APP_DB_NAME", "pg_mon")
-    user = os.environ.get("APP_DB_USER", "pg_mon")
-    password = os.environ.get("APP_DB_PASS", "pg_mon_pass")
+    dbname = os.environ.get("APP_DB_NAME", "pgmon_db")
+    user = os.environ.get("APP_DB_USER", "pgmon_user")
+    password = os.environ.get("APP_DB_PASS", "pgmon_password123")
     
     conn_str = f"host={host} port={port} dbname={dbname} user={user} password={password} connect_timeout=10"
     

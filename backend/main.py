@@ -170,7 +170,7 @@ async def monitor_scheduler():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: init database and launch monitor background task
-    logger.info("Initializing SQLite tables...")
+    logger.info("Initializing configuration database tables...")
     config.init_db()
     
     # Run a quick startup pass to check active databases
