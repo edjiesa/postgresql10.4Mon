@@ -1,17 +1,24 @@
 # PostgreSQL Performance Monitor & Alerting Application (PG-Mon)
 
-A lightweight, self-hosted web dashboard designed to monitor performance, active queries, cache hit ratios, and table index statistics across remote PostgreSQL database servers. Features custom real-time alert dispatching (via Telegram, Discord, and Slack) with anti-spam alert throttling, and the ability to terminate runaway database processes directly from the UI.
+A lightweight, self-hosted web dashboard designed to monitor performance, active queries, cache hit ratios, and table index statistics across remote PostgreSQL database servers. Features custom real-time alert dispatching (via Telegram, Discord, Slack, n8n, and Google Chat) with anti-spam alert throttling, connection testing, and the ability to terminate runaway database processes directly from the UI.
 
 ---
 
 ## Key Features
 
 - **Multi-Database Support**: Monitor multiple remote databases from a single consolidated control center.
-- **Performance Metrology**: Read PostgreSQL cache-hit ratios, index usage, active pool ratios, and databases size metrics.
-- **Active Query Inspector**: List currently executing queries, identifying their PID, client IP, username, and duration in seconds.
+- **Performance Metrology**: Read PostgreSQL cache-hit ratios, index usage, active pool ratios, database size, and temporary storage bytes/files pressure.
+- **Active Query & Inactive Session Inspector**:
+  - List currently executing queries, identifying their PID, client IP, username, and duration.
+  - List inactive/locked sessions (e.g. `idle in transaction`) to track holding locks.
 - **Runaway Process Termination (Kill Query)**: Stop slow or locking database processes with a single click in the UI.
 - **Lock & Blocking Monitors**: Detect query locks where one connection blocks another, and send critical alarms.
-- **Dynamic Alerts Configurator**: Easy toggling and configuration of Slack, Discord Webhooks, and Telegram Bot credentials.
+- **Advanced Telemetry sub-tabs**:
+  - **🧹 Autovacuum Health**: View active autovacuum workers and identify tables with the highest dead tuples.
+  - **🔄 Replication Lag**: Track standby replica lag size (MB) for primary servers or recovery delay time for replicas.
+  - **⚠️ Transaction ID Wraparound**: Monitor database and table transaction ages to stay ahead of the 2-billion transaction limit.
+- **Dynamic Alerts Configurator**: Easy toggling and configuration of Slack, Discord, Telegram, n8n, and Google Chat webhook credentials.
+- **🧪 Test Alerting Channels**: Test your webhook bot configurations instantly with mock alerts before saving.
 - **Smart Alert Throttling**: Implements in-memory alert deduplication (10 minutes silence window) to prevent spamming your alert channels for long-running issues.
 - **Premium Glassmorphic Dark UI**: High contrast typography, neon accents, and smooth transitions.
 
@@ -29,6 +36,8 @@ graph TD
     Webhooks -->|HTTP POST| Telegram[Telegram Bot]
     Webhooks -->|HTTP POST| Discord[Discord Webhook]
     Webhooks -->|HTTP POST| Slack[Slack Webhook]
+    Webhooks -->|HTTP POST| n8n[n8n Webhook]
+    Webhooks -->|HTTP POST| GoogleChat[Google Chat Space]
 ```
 
 ---
@@ -41,8 +50,8 @@ This is the easiest way to deploy the application on your server. Docker Compose
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/postgresqlmon.git
-   cd postgresqlmon
+   git clone https://github.com/edjiesa/postgresql10.4Mon.git
+   cd postgresql10.4Mon
    ```
 
 2. **Launch with Docker Compose**:
@@ -98,7 +107,7 @@ Ensure you have **Python 3.11+** installed on your system.
 To get the most out of **PG-Mon**, ensure the credentials you register have appropriate permissions on the target database servers:
 
 1. **Monitoring Permissions**:
-   To read active database connections and statistics, the database user should belong to the **`pg_monitor`** default role:
+   To read active database connections, autovacuum stats, and system replication metrics, the database user should belong to the **`pg_monitor`** default role:
    ```sql
    GRANT pg_monitor TO your_monitoring_user;
    ```
@@ -123,17 +132,27 @@ To get the most out of **PG-Mon**, ensure the credentials you register have appr
 
 ## 🔔 Setting Up Alert Channels
 
+All alert channels feature a **🧪 Test** button so you can send a mock performace alert to verify credentials immediately.
+
 ### 💬 Telegram Bot Configuration
 1. Chat with `@BotFather` on Telegram to create a new bot and copy the **Bot Token**.
-2. Create a Telegram channel or group, add your bot as an administrator, and get the **Chat ID** (e.g. using `@RawDataBot` or sending a message and checking `https://api.telegram.org/bot<Token>/getUpdates`).
-3. Add these credentials in the **Alerts Config** tab of the dashboard and toggle it to **Enabled**.
+2. Create a Telegram channel or group, add your bot as an administrator, and get the **Chat ID** (e.g. using `@RawDataBot`).
+3. Add these credentials in the **Alerts Config** tab and click **🧪 Test** to verify before saving.
 
 ### 🎮 Discord Webhook Configuration
 1. Go to your Discord server, open **Server Settings** > **Integrations** > **Webhooks**.
 2. Click **New Webhook**, select a channel, and copy the **Webhook URL**.
-3. Paste the URL into the Discord card in the **Alerts Config** tab and toggle it to **Enabled**.
+3. Paste the URL into the Discord card, test it, and save.
 
 ### 💼 Slack Webhook Configuration
 1. Create a Slack App in your workspace, enable **Incoming Webhooks**, and click **Add New Webhook to Workspace**.
-2. Copy the generated **Webhook URL**.
-3. Paste the URL into the Slack card in the **Alerts Config** tab and toggle it to **Enabled**.
+2. Copy the generated **Webhook URL** and paste it into the Slack card.
+
+### 🔗 n8n Webhook Configuration
+1. Create a workflow in your n8n workspace with a **Webhook Trigger** node (using the HTTP POST method).
+2. Copy the Webhook URL and paste it into the n8n card.
+
+### 💬 Google Chat Spaces Webhook Configuration
+1. Open Google Chat, go to the Space where you want to receive alerts.
+2. Click the Space header dropdown and select **Apps & integrations** > **Webhooks**.
+3. Add a name, click **Save**, copy the webhook URL, and paste it into the Google Chat Space card.
