@@ -767,6 +767,56 @@ async function saveAlertChannel(channel) {
     }
 }
 
+async function testAlertChannel(channel) {
+    let config = {};
+    let is_enabled = false;
+    
+    if (channel === 'telegram') {
+        is_enabled = document.getElementById('tg-enabled').checked;
+        config = {
+            bot_token: document.getElementById('tg-bot-token').value,
+            chat_id: document.getElementById('tg-chat-id').value
+        };
+    } else if (channel === 'discord') {
+        is_enabled = document.getElementById('discord-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('discord-webhook-url').value
+        };
+    } else if (channel === 'slack') {
+        is_enabled = document.getElementById('slack-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('slack-webhook-url').value
+        };
+    } else if (channel === 'n8n') {
+        is_enabled = document.getElementById('n8n-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('n8n-webhook-url').value
+        };
+    }
+    
+    showToast(`Sending test alert to ${channel}...`, 'info');
+    try {
+        const response = await fetch(`/api/alerts/test/${channel}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ config, is_enabled })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.detail || "Test connection failed.");
+        }
+        
+        if (result.success) {
+            showToast(`Test message sent successfully to ${channel.toUpperCase()}!`, 'success');
+        } else {
+            throw new Error(result.message || "Test message failed to deliver.");
+        }
+    } catch (e) {
+        showToast("Test Failed: " + e.message, 'error');
+    }
+}
+
 // --- Alert Logs History ---
 
 async function fetchLogs() {

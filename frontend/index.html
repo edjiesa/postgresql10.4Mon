@@ -88,7 +88,10 @@
                                 <label for="tg-chat-id">Chat ID</label>
                                 <input type="text" id="tg-chat-id" placeholder="-100123456789">
                             </div>
-                            <button class="btn btn-secondary" onclick="saveAlertChannel('telegram')">Save Telegram Config</button>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" onclick="saveAlertChannel('telegram')" style="flex-grow: 1;">Save Telegram Config</button>
+                                <button class="btn btn-text" onclick="testAlertChannel('telegram')">🧪 Test</button>
+                            </div>
                         </div>
                     </div>
 
@@ -108,7 +111,10 @@
                                 <label for="discord-webhook-url">Webhook URL</label>
                                 <input type="text" id="discord-webhook-url" placeholder="https://discord.com/api/webhooks/...">
                             </div>
-                            <button class="btn btn-secondary" onclick="saveAlertChannel('discord')">Save Discord Config</button>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" onclick="saveAlertChannel('discord')" style="flex-grow: 1;">Save Discord Config</button>
+                                <button class="btn btn-text" onclick="testAlertChannel('discord')">🧪 Test</button>
+                            </div>
                         </div>
                     </div>
 
@@ -128,7 +134,10 @@
                                 <label for="slack-webhook-url">Webhook URL</label>
                                 <input type="text" id="slack-webhook-url" placeholder="https://hooks.slack.com/services/...">
                             </div>
-                            <button class="btn btn-secondary" onclick="saveAlertChannel('slack')">Save Slack Config</button>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" onclick="saveAlertChannel('slack')" style="flex-grow: 1;">Save Slack Config</button>
+                                <button class="btn btn-text" onclick="testAlertChannel('slack')">🧪 Test</button>
+                            </div>
                         </div>
                     </div>
 
@@ -148,7 +157,10 @@
                                 <label for="n8n-webhook-url">Webhook URL</label>
                                 <input type="text" id="n8n-webhook-url" placeholder="https://primary-n8n.domain.com/webhook/... ">
                             </div>
-                            <button class="btn btn-secondary" onclick="saveAlertChannel('n8n')">Save n8n Config</button>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" onclick="saveAlertChannel('n8n')" style="flex-grow: 1;">Save n8n Config</button>
+                                <button class="btn btn-text" onclick="testAlertChannel('n8n')">🧪 Test</button>
+                            </div>
                         </div>
                     </div>
                 </div>

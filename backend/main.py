@@ -329,6 +329,14 @@ async def api_update_alerts(channel: str, data: AlertSettingsModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/alerts/test/{channel}")
+async def api_test_alert(channel: str, data: AlertSettingsModel):
+    if channel not in ["telegram", "discord", "slack", "n8n"]:
+        raise HTTPException(status_code=400, detail="Invalid alert channel.")
+        
+    success, message = await asyncio.to_thread(alerts.send_test_alert, channel, data.config)
+    return {"success": success, "message": message}
+
 @app.get("/api/logs")
 async def api_get_logs():
     try:

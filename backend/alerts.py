@@ -213,3 +213,84 @@ def trigger_alert(db_id, db_name, alert_type, severity, message, details=None, i
                 "details": details
             }
             send_webhook_message(webhook_url, n8n_payload)
+
+def send_test_alert(channel_name, config_dict):
+    """
+    Sends a mock test alert to the specified channel to verify credentials.
+    Returns (success_bool, message_str).
+    """
+    emoji = "🧪"
+    db_name = "Test_Database"
+    alert_type = "connection_limit"
+    severity = "warning"
+    message = "This is a mock performance alert to test your PG-Mon channel configuration."
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+    
+    text_message = (
+        f"{emoji} <b>[POSTGRESQL MON - TEST]</b>\n"
+        f"<b>Database:</b> {db_name}\n"
+        f"<b>Alert:</b> Connection Limit Warning\n"
+        f"<b>Severity:</b> WARNING\n"
+        f"<b>Time:</b> {timestamp}\n\n"
+        f"<b>Message:</b> {message}"
+    )
+
+    if channel_name == "telegram":
+        bot_token = config_dict.get("bot_token")
+        chat_id = config_dict.get("chat_id")
+        if not bot_token or not chat_id:
+            return False, "Bot token and Chat ID are required."
+        return send_telegram_message(bot_token, chat_id, text_message)
+        
+    elif channel_name == "discord":
+        webhook_url = config_dict.get("webhook_url")
+        if not webhook_url:
+            return False, "Webhook URL is required."
+        discord_payload = {
+            "username": "PostgreSQL Monitor Test",
+            "embeds": [{
+                "title": f"{emoji} DB Performance Alert (TEST): {db_name}",
+                "color": 15844367, # warning yellow
+                "description": message,
+                "fields": [
+                    {"name": "Alert Type", "value": "Connection Limit Warning", "inline": True},
+                    {"name": "Severity", "value": "WARNING", "inline": True},
+                    {"name": "Timestamp", "value": timestamp, "inline": True}
+                ],
+                "footer": {"text": "PostgreSQL Monitoring Test System"}
+            }]
+        }
+        return send_webhook_message(webhook_url, discord_payload)
+        
+    elif channel_name == "slack":
+        webhook_url = config_dict.get("webhook_url")
+        if not webhook_url:
+            return False, "Webhook URL is required."
+        mrkdwn_text = text_message.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`")
+        slack_payload = {
+            "text": mrkdwn_text
+        }
+        return send_webhook_message(webhook_url, slack_payload)
+        
+    elif channel_name == "n8n":
+        webhook_url = config_dict.get("webhook_url")
+        if not webhook_url:
+            return False, "Webhook URL is required."
+        n8n_payload = {
+            "event": "database_performance_alert_test",
+            "database_id": 0,
+            "database_name": db_name,
+            "alert_type": alert_type,
+            "severity": severity,
+            "message": message,
+            "timestamp": timestamp,
+            "details": {
+                "active_connections": 80,
+                "max_connections": 100,
+                "usage_percent": 80.0
+            }
+        }
+        return send_webhook_message(webhook_url, n8n_payload)
+        
+    return False, f"Unknown alert channel: {channel_name}"
+
