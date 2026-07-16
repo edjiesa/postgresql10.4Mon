@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  pg-mon:
+    build: .
+    container_name: pg-mon
+    ports:
+      - "8000:8000"
+    volumes:
+      - pg-mon-data:/app/data
+    restart: always
+    environment:
+      - DATABASE_PATH=/app/data/postgresql_mon.db
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  pg-mon-data:
+    driver: local

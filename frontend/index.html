@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL Database Performance Monitor</title>
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Link to custom stylesheets -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">PG</div>
+                <h1>PG-Mon</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')">
+                    <span class="nav-icon">📊</span> Dashboard
+                </button>
+                <button class="nav-item" id="nav-alerts" onclick="switchTab('alerts')">
+                    <span class="nav-icon">🔔</span> Alerts Config
+                </button>
+                <button class="nav-item" id="nav-logs" onclick="switchTab('logs')">
+                    <span class="nav-icon">📋</span> Alert Logs
+                    <span class="badge" id="logs-badge">0</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <p>Status: <span class="status-dot online"></span> Running</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="header-title">
+                    <h2 id="page-title">Performance Dashboard</h2>
+                    <p class="subtitle" id="page-subtitle">Real-time status of monitored PostgreSQL servers</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-add-db" onclick="openDbModal()">
+                        <span class="btn-icon">+</span> Add Database
+                    </button>
+                </div>
+            </header>
+
+            <!-- Notification Toast Container -->
+            <div id="toast-container" class="toast-container"></div>
+
+            <!-- Tab Content: Dashboard -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="db-grid" id="databases-list">
+                    <!-- Dynamic database cards go here -->
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Scanning configurations and metrics...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Content: Alerts Settings -->
+            <section id="tab-alerts" class="tab-content">
+                <div class="settings-container">
+                    <!-- Telegram Card -->
+                    <div class="settings-card glass">
+                        <div class="settings-card-header">
+                            <span class="channel-icon">💬</span>
+                            <h3>Telegram Bot Alert</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="tg-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="help-text">Receive real-time database issue reports direct to your Telegram chat.</p>
+                            <div class="form-group">
+                                <label for="tg-bot-token">Bot Token</label>
+                                <input type="text" id="tg-bot-token" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+                            </div>
+                            <div class="form-group">
+                                <label for="tg-chat-id">Chat ID</label>
+                                <input type="text" id="tg-chat-id" placeholder="-100123456789">
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveAlertChannel('telegram')">Save Telegram Config</button>
+                        </div>
+                    </div>
+
+                    <!-- Discord Card -->
+                    <div class="settings-card glass">
+                        <div class="settings-card-header">
+                            <span class="channel-icon">🎮</span>
+                            <h3>Discord Webhook Alert</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="discord-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="help-text">Deliver alerts formatted as beautiful rich embeds to a Discord channel.</p>
+                            <div class="form-group">
+                                <label for="discord-webhook-url">Webhook URL</label>
+                                <input type="text" id="discord-webhook-url" placeholder="https://discord.com/api/webhooks/...">
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveAlertChannel('discord')">Save Discord Config</button>
+                        </div>
+                    </div>
+
+                    <!-- Slack Card -->
+                    <div class="settings-card glass">
+                        <div class="settings-card-header">
+                            <span class="channel-icon">💼</span>
+                            <h3>Slack Webhook Alert</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="slack-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="help-text">Post system events directly into your developer team Slack workspace channels.</p>
+                            <div class="form-group">
+                                <label for="slack-webhook-url">Webhook URL</label>
+                                <input type="text" id="slack-webhook-url" placeholder="https://hooks.slack.com/services/...">
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveAlertChannel('slack')">Save Slack Config</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Content: Alert Logs -->
+            <section id="tab-logs" class="tab-content">
+                <div class="logs-container glass">
+                    <div class="logs-header">
+                        <h3>Event Log History</h3>
+                        <button class="btn btn-danger" onclick="clearLogs()">Clear History</button>
+                    </div>
+                    <div class="logs-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Database</th>
+                                    <th>Alert Type</th>
+                                    <th>Severity</th>
+                                    <th>Event Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-tbody">
+                                <!-- Dynamic logs row -->
+                                <tr>
+                                    <td colspan="5" class="text-center">No alert logs recorded.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: Add / Edit Database -->
+    <div class="modal-overlay" id="db-modal">
+        <div class="modal glass">
+            <div class="modal-header">
+                <h3 id="db-modal-title">Add PostgreSQL Database</h3>
+                <button class="modal-close" onclick="closeDbModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="db-form" onsubmit="saveDbForm(event)">
+                    <input type="hidden" id="db-form-id">
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label for="db-name">Display Name</label>
+                            <input type="text" id="db-name" placeholder="Production Server" required>
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="db-ssl">SSL Mode</label>
+                            <select id="db-ssl">
+                                <option value="prefer">Prefer</option>
+                                <option value="require">Require</option>
+                                <option value="disable">Disable</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label for="db-host">Hostname / IP</label>
+                            <input type="text" id="db-host" placeholder="pg-server.internal" required>
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="db-port">Port</label>
+                            <input type="number" id="db-port" value="5432" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="db-username">User</label>
+                            <input type="text" id="db-username" placeholder="postgres" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="db-password">Password</label>
+                            <input type="password" id="db-password" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="db-dbname">Database Name</label>
+                            <input type="text" id="db-dbname" placeholder="app_db" required>
+                        </div>
+                    </div>
+                    
+                    <h4 class="form-section-title">Thresholds & Intervals</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="db-check-interval">Check Interval (seconds)</label>
+                            <input type="number" id="db-check-interval" value="30" min="5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="db-slow-query">Slow Query Limit (seconds)</label>
+                            <input type="number" id="db-slow-query" value="5" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="db-max-conn">Max Connection Warning (%)</label>
+                            <input type="number" id="db-max-conn" value="80" min="10" max="100" required>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+                        <div class="spacer"></div>
+                        <button type="button" class="btn btn-text" onclick="closeDbModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-save-db">Save Database</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Manage Database / Detail metrics view -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal modal-lg glass">
+            <div class="modal-header">
+                <div class="modal-title-with-badge">
+                    <h3 id="detail-db-name">Database Details</h3>
+                    <span class="badge badge-success" id="detail-db-status">Online</span>
+                </div>
+                <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Info cards row -->
+                <div class="metric-cards-row">
+                    <div class="metric-mini-card glass">
+                        <span class="card-label">PostgreSQL Version</span>
+                        <span class="card-value" id="detail-val-version">-</span>
+                    </div>
+                    <div class="metric-mini-card glass">
+                        <span class="card-label">Database Size</span>
+                        <span class="card-value" id="detail-val-size">-</span>
+                    </div>
+                    <div class="metric-mini-card glass">
+                        <span class="card-label">Active Connections</span>
+                        <span class="card-value" id="detail-val-conn">-</span>
+                    </div>
+                    <div class="metric-mini-card glass">
+                        <span class="card-label">Cache Hit Ratio</span>
+                        <span class="card-value" id="detail-val-cache">-</span>
+                    </div>
+                    <div class="metric-mini-card glass">
+                        <span class="card-label">Index Hit Ratio</span>
+                        <span class="card-value" id="detail-val-index">-</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-header">
+                        <h4>🔥 Running Queries (<span id="detail-slow-count">0</span> matching filters)</h4>
+                        <div class="spacer"></div>
+                        <span class="help-bubble" title="Queries that are currently executing in the engine and run longer than configured threshold.">❓</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>User</th>
+                                    <th>Client IP</th>
+                                    <th>Duration</th>
+                                    <th>State</th>
+                                    <th>Query Statement</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail-slow-tbody">
+                                <tr>
+                                    <td colspan="7" class="text-center">No queries currently running slower than threshold.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-header">
+                        <h4>🔒 Blocked Queries (<span id="detail-lock-count">0</span> detected)</h4>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Blocked PID</th>
+                                    <th>Blocked Statement</th>
+                                    <th>Blocking PID</th>
+                                    <th>Blocking User</th>
+                                    <th>Blocking Statement</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail-lock-tbody">
+                                <tr>
+                                    <td colspan="6" class="text-center">No lock blockages detected. Database is operating smoothly.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

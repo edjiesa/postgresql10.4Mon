@@ -1,0 +1,26 @@
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environments
+venv/
+ENV/
+env/
+.env
+
+# Local SQLite databases
+*.db
+postgresql_mon.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor configurations
+.idea/
+.vscode/
+*.swp
+*.swo
