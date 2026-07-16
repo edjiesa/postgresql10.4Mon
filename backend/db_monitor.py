@@ -50,6 +50,7 @@ def check_db_metrics(db_config):
         "cache_hit_ratio": 0.0,
         "index_hit_ratio": 0.0,
         "slow_queries": [],
+        "active_queries": [],
         "blocking_queries": [],
         "timestamp": time.time()
     }
@@ -132,6 +133,30 @@ def check_db_metrics(db_config):
                 metrics["slow_queries"] = [dict(r) for r in rows]
             except Exception as e:
                 logger.warning(f"Error querying slow queries: {e}")
+
+            # 4b. All Active Queries
+            try:
+                cur.execute("""
+                    SELECT 
+                        pid,
+                        usename AS username,
+                        client_addr AS client_ip,
+                        backend_start,
+                        query_start,
+                        state,
+                        wait_event_type,
+                        wait_event,
+                        query,
+                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
+                    FROM pg_stat_activity
+                    WHERE state != 'idle'
+                      AND query NOT LIKE '%%pg_stat_activity%%'
+                    ORDER BY duration_seconds DESC;
+                """)
+                rows = cur.fetchall()
+                metrics["active_queries"] = [dict(r) for r in rows]
+            except Exception as e:
+                logger.warning(f"Error querying active queries: {e}")
 
             # 5. Blocking Locks
             try:

@@ -96,6 +96,7 @@ async def check_and_alert_db(db):
             "cache_hit_ratio": 0.0,
             "index_hit_ratio": 0.0,
             "slow_queries": [],
+            "active_queries": [],
             "blocking_queries": []
         }
         # Trigger Database Offline Alert
@@ -210,6 +211,7 @@ async def api_get_databases():
                     "cache_hit_ratio": 0.0,
                     "index_hit_ratio": 0.0,
                     "slow_queries": [],
+                    "active_queries": [],
                     "blocking_queries": []
                 }
         return dbs

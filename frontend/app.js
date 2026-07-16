@@ -382,26 +382,30 @@ async function fetchDetailMetrics() {
         document.getElementById('detail-val-cache').innerText = metrics.cache_hit_ratio !== undefined ? metrics.cache_hit_ratio + '%' : '-';
         document.getElementById('detail-val-index').innerText = metrics.index_hit_ratio !== undefined ? metrics.index_hit_ratio + '%' : '-';
         
-        // Render Active/Slow Queries Table
-        const slowQueries = metrics.slow_queries || [];
-        document.getElementById('detail-slow-count').innerText = slowQueries.length;
+        // Render Active Queries Table (showing all running queries)
+        const activeQueries = metrics.active_queries || [];
+        document.getElementById('detail-slow-count').innerText = activeQueries.length;
         const slowTbody = document.getElementById('detail-slow-tbody');
         
-        if (slowQueries.length === 0) {
+        if (activeQueries.length === 0) {
             slowTbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center" style="color:var(--text-muted); padding:2rem;">No queries currently running slower than threshold (${db.slow_query_threshold}s).</td>
+                    <td colspan="7" class="text-center" style="color:var(--text-muted); padding:2rem;">No active queries currently executing in the engine.</td>
                 </tr>
             `;
         } else {
             slowTbody.innerHTML = '';
-            slowQueries.forEach(q => {
+            activeQueries.forEach(q => {
+                const isSlow = q.duration_seconds >= db.slow_query_threshold;
+                const durationStyle = isSlow ? 'font-weight:700; color:var(--color-critical);' : 'font-weight:600; color:var(--color-online);';
+                const slowWarning = isSlow ? ' <span class="badge badge-critical" style="margin-left:5px; font-size:0.65rem; padding:1px 4px; border:none; display:inline;">SLOW ⚠️</span>' : '';
+                
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="font-family:var(--font-mono); font-weight:600;">${q.pid}</td>
                     <td>${q.username}</td>
                     <td>${q.client_ip || 'local'}</td>
-                    <td style="font-weight:600; color:var(--color-warning);">${q.duration_seconds}s</td>
+                    <td style="${durationStyle}">${q.duration_seconds}s${slowWarning}</td>
                     <td><span class="status-indicator">${q.state}</span></td>
                     <td><code class="query-text" title="${escapeHtml(q.query)}">${escapeHtml(q.query)}</code></td>
                     <td>
