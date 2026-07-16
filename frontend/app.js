@@ -392,47 +392,7 @@ async function fetchDetailMetrics() {
         document.getElementById('detail-val-temp-files').innerText = tempFiles.toLocaleString();
         document.getElementById('detail-val-temp-bytes').innerText = formatBytes(tempBytes);
         
-        // Remote host OS stats
-        const hostStats = metrics.host_system_stats;
-        const statsCard = document.getElementById('detail-host-os-stats');
-        const fallbackCard = document.getElementById('detail-host-os-fallback');
-        
-        if (hostStats && (hostStats.cpu || hostStats.ram || hostStats.disk)) {
-            statsCard.style.display = 'grid';
-            fallbackCard.style.display = 'none';
-            
-            // CPU Load
-            if (hostStats.cpu) {
-                document.getElementById('detail-val-remote-cpu').innerText = 
-                    `${hostStats.cpu.load_1m.toFixed(2)} / ${hostStats.cpu.load_5m.toFixed(2)} / ${hostStats.cpu.load_15m.toFixed(2)}`;
-            } else {
-                document.getElementById('detail-val-remote-cpu').innerText = '-';
-            }
-            
-            // RAM Usage
-            if (hostStats.ram) {
-                const usedRAM = formatBytes(hostStats.ram.used);
-                const totalRAM = formatBytes(hostStats.ram.total);
-                const ramPct = hostStats.ram.total > 0 ? Math.round((hostStats.ram.used / hostStats.ram.total) * 100) : 0;
-                document.getElementById('detail-val-remote-ram').innerText = `${usedRAM} / ${totalRAM} (${ramPct}%)`;
-            } else {
-                document.getElementById('detail-val-remote-ram').innerText = '-';
-            }
-            
-            // Disk Usage
-            if (hostStats.disk && hostStats.disk.length > 0) {
-                const primaryDisk = hostStats.disk[0];
-                const usedDisk = formatBytes(primaryDisk.used_space);
-                const totalDisk = formatBytes(primaryDisk.total_space);
-                const diskPct = primaryDisk.total_space > 0 ? Math.round((primaryDisk.used_space / primaryDisk.total_space) * 100) : 0;
-                document.getElementById('detail-val-remote-disk').innerText = `${usedDisk} / ${totalDisk} (${diskPct}%) on ${primaryDisk.mount_point}`;
-            } else {
-                document.getElementById('detail-val-remote-disk').innerText = '-';
-            }
-        } else {
-            statsCard.style.display = 'none';
-            fallbackCard.style.display = 'flex';
-        }
+
         
         // Render Active Queries Table (showing all running queries)
         const activeQueries = metrics.active_queries || [];
