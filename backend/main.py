@@ -212,6 +212,7 @@ async def api_get_databases():
                     "index_hit_ratio": 0.0,
                     "slow_queries": [],
                     "active_queries": [],
+                    "idle_queries": [],
                     "blocking_queries": []
                 }
         return dbs

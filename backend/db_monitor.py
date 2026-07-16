@@ -51,6 +51,7 @@ def check_db_metrics(db_config):
         "index_hit_ratio": 0.0,
         "slow_queries": [],
         "active_queries": [],
+        "idle_queries": [],
         "blocking_queries": [],
         "temp_files": 0,
         "temp_bytes": 0,
@@ -152,7 +153,7 @@ def check_db_metrics(db_config):
             except Exception as e:
                 logger.warning(f"Error querying slow queries: {e}")
 
-            # 4b. All Active Queries
+            # 4b. All Active and Idle Sessions
             try:
                 cur.execute("""
                     SELECT 
@@ -161,20 +162,32 @@ def check_db_metrics(db_config):
                         client_addr AS client_ip,
                         backend_start,
                         query_start,
+                        state_change,
                         state,
                         wait_event_type,
                         wait_event,
                         query,
-                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
+                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS query_duration_seconds,
+                        round(extract(epoch from (clock_timestamp() - state_change))::numeric, 2) AS idle_duration_seconds
                     FROM pg_stat_activity
-                    WHERE state != 'idle'
-                      AND query NOT LIKE '%%pg_stat_activity%%'
-                    ORDER BY duration_seconds DESC;
+                    WHERE query NOT LIKE '%%pg_stat_activity%%'
+                    ORDER BY COALESCE(query_start, state_change) DESC;
                 """)
                 rows = cur.fetchall()
-                metrics["active_queries"] = [dict(r) for r in rows]
+                active_list = []
+                idle_list = []
+                for r in rows:
+                    d = dict(r)
+                    if d.get("state") == "active":
+                        d["duration_seconds"] = float(d.get("query_duration_seconds") or 0.0)
+                        active_list.append(d)
+                    else:
+                        d["duration_seconds"] = float(d.get("idle_duration_seconds") or 0.0)
+                        idle_list.append(d)
+                metrics["active_queries"] = active_list
+                metrics["idle_queries"] = idle_list
             except Exception as e:
-                logger.warning(f"Error querying active queries: {e}")
+                logger.warning(f"Error querying sessions: {e}")
 
             # 5. Blocking Locks
             try:

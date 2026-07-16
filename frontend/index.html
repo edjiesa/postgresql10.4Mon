@@ -346,6 +346,32 @@
 
                 <div class="detail-section">
                     <div class="detail-section-header">
+                        <h4>💤 Idle & In-Transaction Sessions (<span id="detail-idle-count">0</span> sessions)</h4>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>User</th>
+                                    <th>Client IP</th>
+                                    <th>Idle Duration</th>
+                                    <th>State</th>
+                                    <th>Last Query Statement</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail-idle-tbody">
+                                <tr>
+                                    <td colspan="7" class="text-center">No idle or inactive sessions detected.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-header">
                         <h4>🔒 Blocked Queries (<span id="detail-lock-count">0</span> detected)</h4>
                     </div>
                     <div class="table-wrapper">

@@ -426,6 +426,38 @@ async function fetchDetailMetrics() {
             });
         }
         
+        // Render Idle & In-Transaction Queries Table
+        const idleQueries = metrics.idle_queries || [];
+        document.getElementById('detail-idle-count').innerText = idleQueries.length;
+        const idleTbody = document.getElementById('detail-idle-tbody');
+        
+        if (idleQueries.length === 0) {
+            idleTbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center" style="color:var(--text-muted); padding:2rem;">No idle or inactive sessions detected.</td>
+                </tr>
+            `;
+        } else {
+            idleTbody.innerHTML = '';
+            idleQueries.forEach(q => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--font-mono); font-weight:600;">${q.pid}</td>
+                    <td>${q.username}</td>
+                    <td>${q.client_ip || 'local'}</td>
+                    <td style="font-weight:600; color:var(--text-muted);">${q.duration_seconds}s</td>
+                    <td><span class="status-indicator">${q.state}</span></td>
+                    <td><code class="query-text" title="${escapeHtml(q.query)}">${escapeHtml(q.query) || 'None'}</code></td>
+                    <td>
+                        <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Session" onclick="killQuery(${db.id}, ${q.pid}, 'Idle session')">
+                            ⚡
+                        </button>
+                    </td>
+                `;
+                idleTbody.appendChild(tr);
+            });
+        }
+        
         // Render Blocking Locks Table
         const blockingQueries = metrics.blocking_queries || [];
         document.getElementById('detail-lock-count').innerText = blockingQueries.length;
