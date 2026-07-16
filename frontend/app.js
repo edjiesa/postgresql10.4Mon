@@ -18,10 +18,6 @@ function initApp() {
     
     // Start background polling for dashboard (every 10 seconds)
     dashboardPollInterval = setInterval(fetchDatabases, 10000);
-    
-    // Start background polling for local system metrics (every 10 seconds)
-    fetchSystemMetrics();
-    setInterval(fetchSystemMetrics, 10000);
 }
 
 // Navigation / Tabs switching
@@ -663,48 +659,7 @@ function escapeHtml(str) {
         .replace(/'/g, "&#039;");
 }
 
-async function fetchSystemMetrics() {
-    try {
-        const response = await fetch('/api/system/metrics');
-        if (!response.ok) throw new Error("Failed to fetch system metrics");
-        const data = await response.json();
-        if (data.status === 'success') {
-            // CPU
-            const cpuPct = Math.round(data.cpu.percent);
-            document.getElementById('sys-cpu-val').innerText = `${cpuPct}%`;
-            document.getElementById('sys-cpu-bar').style.width = `${cpuPct}%`;
-            setMetricBarColor(document.getElementById('sys-cpu-bar'), cpuPct);
-            
-            // RAM
-            const ramPct = Math.round(data.ram.percent);
-            const ramUsedGB = (data.ram.used / (1024 ** 3)).toFixed(1);
-            const ramTotalGB = (data.ram.total / (1024 ** 3)).toFixed(1);
-            document.getElementById('sys-ram-val').innerText = `${ramUsedGB}/${ramTotalGB} GB (${ramPct}%)`;
-            document.getElementById('sys-ram-bar').style.width = `${ramPct}%`;
-            setMetricBarColor(document.getElementById('sys-ram-bar'), ramPct);
-            
-            // Disk
-            const diskPct = Math.round(data.disk.percent);
-            const diskUsedGB = (data.disk.used / (1024 ** 3)).toFixed(1);
-            const diskTotalGB = (data.disk.total / (1024 ** 3)).toFixed(1);
-            document.getElementById('sys-disk-drive').innerText = data.disk.drive;
-            document.getElementById('sys-disk-val').innerText = `${diskUsedGB}/${diskTotalGB} GB (${diskPct}%)`;
-            document.getElementById('sys-disk-bar').style.width = `${diskPct}%`;
-            setMetricBarColor(document.getElementById('sys-disk-bar'), diskPct);
-        }
-    } catch (error) {
-        console.error("System metrics error:", error);
-    }
-}
 
-function setMetricBarColor(barElement, percentage) {
-    barElement.classList.remove('warning', 'critical');
-    if (percentage >= 90) {
-        barElement.classList.add('critical');
-    } else if (percentage >= 75) {
-        barElement.classList.add('warning');
-    }
-}
 
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
