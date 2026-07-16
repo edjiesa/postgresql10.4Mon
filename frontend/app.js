@@ -716,6 +716,11 @@ async function fetchAlertSettings() {
         document.getElementById('n8n-enabled').checked = n8n.is_enabled;
         document.getElementById('n8n-webhook-url').value = n8n.config.webhook_url || '';
         
+        // 5. Google Chat
+        const gchat = channels.google_chat || { config: {}, is_enabled: false };
+        document.getElementById('gchat-enabled').checked = gchat.is_enabled;
+        document.getElementById('gchat-webhook-url').value = gchat.config.webhook_url || '';
+        
     } catch (e) {
         showToast("Error loading alert configs: " + e.message, 'error');
     }
@@ -745,6 +750,11 @@ async function saveAlertChannel(channel) {
         is_enabled = document.getElementById('n8n-enabled').checked;
         config = {
             webhook_url: document.getElementById('n8n-webhook-url').value
+        };
+    } else if (channel === 'google_chat') {
+        is_enabled = document.getElementById('gchat-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('gchat-webhook-url').value
         };
     }
     
@@ -791,6 +801,11 @@ async function testAlertChannel(channel) {
         is_enabled = document.getElementById('n8n-enabled').checked;
         config = {
             webhook_url: document.getElementById('n8n-webhook-url').value
+        };
+    } else if (channel === 'google_chat') {
+        is_enabled = document.getElementById('gchat-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('gchat-webhook-url').value
         };
     }
     

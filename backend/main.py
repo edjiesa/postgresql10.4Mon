@@ -320,7 +320,7 @@ async def api_get_alerts():
 
 @app.put("/api/alerts/{channel}")
 async def api_update_alerts(channel: str, data: AlertSettingsModel):
-    if channel not in ["telegram", "discord", "slack", "n8n"]:
+    if channel not in ["telegram", "discord", "slack", "n8n", "google_chat"]:
         raise HTTPException(status_code=400, detail="Invalid alert channel.")
         
     try:
@@ -331,7 +331,7 @@ async def api_update_alerts(channel: str, data: AlertSettingsModel):
 
 @app.post("/api/alerts/test/{channel}")
 async def api_test_alert(channel: str, data: AlertSettingsModel):
-    if channel not in ["telegram", "discord", "slack", "n8n"]:
+    if channel not in ["telegram", "discord", "slack", "n8n", "google_chat"]:
         raise HTTPException(status_code=400, detail="Invalid alert channel.")
         
     success, message = await asyncio.to_thread(alerts.send_test_alert, channel, data.config)

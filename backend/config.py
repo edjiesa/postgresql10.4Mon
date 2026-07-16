@@ -49,13 +49,13 @@ def init_db():
     """)
     
     # Initialize default alert channels if they don't exist
-    for channel in ["telegram", "discord", "slack", "n8n"]:
+    for channel in ["telegram", "discord", "slack", "n8n", "google_chat"]:
         cursor.execute("SELECT 1 FROM alert_settings WHERE channel = ?", (channel,))
         if not cursor.fetchone():
             default_config = {}
             if channel == "telegram":
                 default_config = {"bot_token": "", "chat_id": ""}
-            elif channel in ["discord", "slack", "n8n"]:
+            elif channel in ["discord", "slack", "n8n", "google_chat"]:
                 default_config = {"webhook_url": ""}
             cursor.execute(
                 "INSERT INTO alert_settings (channel, config, is_enabled) VALUES (?, ?, 0)",

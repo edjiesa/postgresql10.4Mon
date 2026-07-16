@@ -163,6 +163,29 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Google Chat Card -->
+                    <div class="settings-card glass">
+                        <div class="settings-card-header">
+                            <span class="channel-icon">💬</span>
+                            <h3>Google Chat Space Webhook</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="gchat-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="help-text">Send performance alerts directly to a Google Chat Space incoming webhook.</p>
+                            <div class="form-group">
+                                <label for="gchat-webhook-url">Webhook URL</label>
+                                <input type="text" id="gchat-webhook-url" placeholder="https://chat.googleapis.com/v1/spaces/... ">
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" onclick="saveAlertChannel('google_chat')" style="flex-grow: 1;">Save Google Chat Config</button>
+                                <button class="btn btn-text" onclick="testAlertChannel('google_chat')">🧪 Test</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -214,6 +214,18 @@ def trigger_alert(db_id, db_name, alert_type, severity, message, details=None, i
             }
             send_webhook_message(webhook_url, n8n_payload)
 
+    # E. Google Chat
+    gchat = settings.get("google_chat")
+    if gchat and gchat.get("is_enabled"):
+        cfg = gchat.get("config", {})
+        webhook_url = cfg.get("webhook_url")
+        if webhook_url:
+            mrkdwn_text = text_message.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`")
+            gchat_payload = {
+                "text": mrkdwn_text
+            }
+            send_webhook_message(webhook_url, gchat_payload)
+
 def send_test_alert(channel_name, config_dict):
     """
     Sends a mock test alert to the specified channel to verify credentials.
@@ -291,6 +303,16 @@ def send_test_alert(channel_name, config_dict):
             }
         }
         return send_webhook_message(webhook_url, n8n_payload)
+        
+    elif channel_name == "google_chat":
+        webhook_url = config_dict.get("webhook_url")
+        if not webhook_url:
+            return False, "Webhook URL is required."
+        mrkdwn_text = text_message.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`")
+        gchat_payload = {
+            "text": mrkdwn_text
+        }
+        return send_webhook_message(webhook_url, gchat_payload)
         
     return False, f"Unknown alert channel: {channel_name}"
 
