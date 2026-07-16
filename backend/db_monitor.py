@@ -178,9 +178,12 @@ def check_db_metrics(db_config):
                 idle_list = []
                 for r in rows:
                     d = dict(r)
-                    if d.get("state") == "active":
+                    state = d.get("state")
+                    if state == "active":
                         d["duration_seconds"] = float(d.get("query_duration_seconds") or 0.0)
                         active_list.append(d)
+                    elif state == "idle":
+                        continue
                     else:
                         d["duration_seconds"] = float(d.get("idle_duration_seconds") or 0.0)
                         idle_list.append(d)
