@@ -30,7 +30,7 @@ A lightweight, self-hosted web dashboard designed to monitor performance, active
 graph TD
     User([Administrator]) -->|Interacts| Frontend[Glassmorphic Web UI]
     Frontend -->|REST APIs / Poll| Backend[FastAPI Server]
-    Backend -->|Saves settings & logs| SQLite[(Local SQLite DB)]
+    Backend -->|Saves settings & logs| AppDB[(App Config PostgreSQL DB)]
     Backend -->|Monitors health & stats| RemotePG[(Remote PostgreSQL Servers)]
     Backend -->|Sends alerts| Webhooks{Alarms Dispatcher}
     Webhooks -->|HTTP POST| Telegram[Telegram Bot]
@@ -46,7 +46,7 @@ graph TD
 
 ### Method 1: Using Docker & Docker Compose (Recommended)
 
-This is the easiest way to deploy the application on your server. Docker Compose ensures that the configuration SQLite database remains persistent between service recreations.
+This is the easiest way to deploy the application on your server. Docker Compose launches both the web application and its dedicated PostgreSQL database container to store configs and logs.
 
 1. **Clone the repository**:
    ```bash
@@ -59,7 +59,7 @@ This is the easiest way to deploy the application on your server. Docker Compose
    docker-compose up -d --build
    ```
 
-3. **Verify the container is running**:
+3. **Verify the containers are running**:
    ```bash
    docker ps
    ```
@@ -67,13 +67,13 @@ This is the easiest way to deploy the application on your server. Docker Compose
 4. **Access the application**:
    Open your browser and navigate to: **`http://<your-server-ip>:8000`**
 
-*Note: The SQLite configuration database is stored on the host under the docker volume `pg-mon-data` to preserve your saved connections.*
+*Note: The application configuration database is persistent on the host at `/opt/postgresql10.4Mon` to preserve your database connections and settings.*
 
 ---
 
 ### Method 2: Manual Installation (Local Development)
 
-Ensure you have **Python 3.11+** installed on your system.
+Ensure you have **Python 3.11+** installed on your system, and an active PostgreSQL server to store PG-Mon configuration tables.
 
 1. **Create and activate a virtual environment**:
    - **Windows**:
@@ -92,10 +92,25 @@ Ensure you have **Python 3.11+** installed on your system.
    pip install -r requirements.txt
    ```
 
-3. **Run the FastAPI server**:
-   ```bash
-   python -m backend.main
-   ```
+3. **Configure environment variables & run FastAPI server**:
+   - **Windows (PowerShell)**:
+     ```powershell
+     $env:APP_DB_HOST="localhost"
+     $env:APP_DB_PORT="5432"
+     $env:APP_DB_NAME="pg_mon"
+     $env:APP_DB_USER="pg_mon"
+     $env:APP_DB_PASS="pg_mon_pass"
+     python -m backend.main
+     ```
+   - **Linux / macOS**:
+     ```bash
+     export APP_DB_HOST="localhost"
+     export APP_DB_PORT="5432"
+     export APP_DB_NAME="pg_mon"
+     export APP_DB_USER="pg_mon"
+     export APP_DB_PASS="pg_mon_pass"
+     python -m backend.main
+     ```
 
 4. **Access the UI**:
    Open your web browser at **`http://localhost:8000`**
