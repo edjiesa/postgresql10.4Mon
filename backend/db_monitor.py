@@ -55,6 +55,17 @@ def check_db_metrics(db_config):
         "blocking_queries": [],
         "temp_files": 0,
         "temp_bytes": 0,
+        "autovacuum_workers": [],
+        "dead_tuples_tables": [],
+        "wraparound_stats": {
+            "db_wraparound": [],
+            "table_wraparound": []
+        },
+        "replication_stats": {
+            "is_replica": False,
+            "replica_lag_seconds": 0.0,
+            "standby_clients": []
+        },
         "timestamp": time.time()
     }
     
@@ -224,6 +235,118 @@ def check_db_metrics(db_config):
                 metrics["blocking_queries"] = [dict(r) for r in rows]
             except Exception as e:
                 logger.warning(f"Error querying blocking locks: {e}")
+
+            # 6. Autovacuum Workers
+            try:
+                cur.execute("""
+                    SELECT 
+                        pid,
+                        query,
+                        state,
+                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
+                    FROM pg_stat_activity
+                    WHERE query LIKE 'autovacuum%%' 
+                      AND pid != pg_backend_pid();
+                """)
+                rows = cur.fetchall()
+                metrics["autovacuum_workers"] = [dict(r) for r in rows]
+            except Exception as e:
+                logger.warning(f"Error querying autovacuum workers: {e}")
+
+            # 7. Dead Tuples Tables
+            try:
+                cur.execute("""
+                    SELECT 
+                        schemaname || '.' || relname AS table_name,
+                        n_dead_tup AS dead_tuples,
+                        n_live_tup AS live_tuples,
+                        round((n_dead_tup::float / COALESCE(NULLIF(n_dead_tup + n_live_tup, 0), 1)::float) * 100, 2) AS dead_tuples_ratio,
+                        last_vacuum,
+                        last_autovacuum,
+                        last_analyze,
+                        last_autoanalyze
+                    FROM pg_stat_user_tables
+                    ORDER BY n_dead_tup DESC
+                    LIMIT 5;
+                """)
+                rows = cur.fetchall()
+                res_rows = []
+                for r in rows:
+                    d = dict(r)
+                    for k in ["last_vacuum", "last_autovacuum", "last_analyze", "last_autoanalyze"]:
+                        if d.get(k):
+                            d[k] = d[k].isoformat() if hasattr(d[k], "isoformat") else str(d[k])
+                    res_rows.append(d)
+                metrics["dead_tuples_tables"] = res_rows
+            except Exception as e:
+                logger.warning(f"Error querying dead tuples: {e}")
+
+            # 8. Transaction ID Wraparound (Databases & Tables age)
+            try:
+                cur.execute("""
+                    SELECT 
+                        datname,
+                        age(datfrozenxid) AS txid_age,
+                        2147483648 - age(datfrozenxid) AS txids_remaining,
+                        round((age(datfrozenxid)::float / 2147483648::float) * 100, 2) AS wraparound_percent
+                    FROM pg_database
+                    WHERE datallowconn
+                    ORDER BY txid_age DESC;
+                """)
+                db_rows = cur.fetchall()
+                metrics["wraparound_stats"]["db_wraparound"] = [dict(r) for r in db_rows]
+
+                cur.execute("""
+                    SELECT 
+                        c.oid::regclass::text AS table_name,
+                        age(c.relfrozenxid) AS table_age,
+                        round((age(c.relfrozenxid)::float / 2147483648::float) * 100, 2) AS table_wraparound_percent
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind = 'r'
+                      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY table_age DESC
+                    LIMIT 5;
+                """)
+                table_rows = cur.fetchall()
+                metrics["wraparound_stats"]["table_wraparound"] = [dict(r) for r in table_rows]
+            except Exception as e:
+                logger.warning(f"Error querying txid wraparound: {e}")
+
+            # 9. Replication Lag
+            try:
+                cur.execute("SELECT pg_is_in_recovery();")
+                is_recovery = cur.fetchone()
+                
+                if is_recovery and is_recovery.get("pg_is_in_recovery"):
+                    metrics["replication_stats"]["is_replica"] = True
+                    cur.execute("""
+                        SELECT 
+                            pg_last_wal_receive_lsn()::text AS last_receive_lsn,
+                            pg_last_wal_replay_lsn()::text AS last_replay_lsn,
+                            pg_last_xact_replay_timestamp() AS last_replay_timestamp,
+                            round(extract(epoch from (now() - pg_last_xact_replay_timestamp()))::numeric, 2) AS replication_lag_seconds;
+                    """)
+                    rep_row = cur.fetchone()
+                    if rep_row:
+                        metrics["replication_stats"]["replica_lag_seconds"] = float(rep_row.get("replication_lag_seconds") or 0.0)
+                        if rep_row.get("last_replay_timestamp"):
+                            metrics["replication_stats"]["last_replay_timestamp"] = rep_row.get("last_replay_timestamp").isoformat() if hasattr(rep_row.get("last_replay_timestamp"), "isoformat") else str(rep_row.get("last_replay_timestamp"))
+                else:
+                    metrics["replication_stats"]["is_replica"] = False
+                    cur.execute("""
+                        SELECT 
+                            client_addr::text AS standby_ip,
+                            application_name,
+                            state,
+                            sync_state,
+                            round(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) / 1024 / 1024, 2) AS lag_mb
+                        FROM pg_stat_replication;
+                    """)
+                    standby_rows = cur.fetchall()
+                    metrics["replication_stats"]["standby_clients"] = [dict(r) for r in standby_rows]
+            except Exception as e:
+                logger.warning(f"Error querying replication lag: {e}")
 
     return metrics
 

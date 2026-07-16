@@ -274,7 +274,16 @@
                 <button class="modal-close" onclick="closeDetailModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <!-- Info cards row -->
+                <!-- Sub-tab Bar -->
+                <div class="modal-tabs">
+                    <button class="modal-tab-btn active" id="modal-tab-btn-overview" onclick="switchModalTab('overview')">📊 Overview & Sessions</button>
+                    <button class="modal-tab-btn" id="modal-tab-btn-vacuum" onclick="switchModalTab('vacuum')">🧹 Autovacuum Health (<span id="detail-badge-vacuum">0</span>)</button>
+                    <button class="modal-tab-btn" id="modal-tab-btn-replica" onclick="switchModalTab('replica')">🔄 Replication & TXID</button>
+                </div>
+
+                <!-- Tab Content: Overview -->
+                <div id="modal-tab-content-overview" class="modal-tab-content">
+                    <!-- Info cards row -->
                 <div class="metric-cards-row">
                     <div class="metric-mini-card glass">
                         <span class="card-label">PostgreSQL Version</span>
@@ -392,6 +401,148 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                </div> <!-- Closes modal-tab-content-overview -->
+
+                <!-- Tab Content: Autovacuum Health -->
+                <div id="modal-tab-content-vacuum" class="modal-tab-content" style="display: none;">
+                    <!-- Active Autovacuum Workers -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <h4>🧹 Active Autovacuum Workers (<span id="detail-vacuum-workers-count">0</span> running)</h4>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>PID</th>
+                                        <th>Query Statement</th>
+                                        <th>State</th>
+                                        <th>Duration</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-vacuum-workers-tbody">
+                                    <tr>
+                                        <td colspan="5" class="text-center">No active autovacuum workers running.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Dead Tuples & Vacuum Need -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <h4>📊 Tables Needing Vacuum (Top 5 user tables by Dead Tuples)</h4>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Table Name</th>
+                                        <th>Dead Tuples</th>
+                                        <th>Live Tuples</th>
+                                        <th>Dead Tuples Ratio</th>
+                                        <th>Last Vacuum</th>
+                                        <th>Last Autovacuum</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-dead-tuples-tbody">
+                                    <tr>
+                                        <td colspan="6" class="text-center">Loading tables metrics...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Replication & TXID -->
+                <div id="modal-tab-content-replica" class="modal-tab-content" style="display: none;">
+                    <!-- Replication Status -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <h4>🔄 Replication Standby Clients (<span id="detail-replica-standby-count">0</span> standbys)</h4>
+                            <span id="detail-replica-status-label" class="badge" style="margin-left: 10px;">Primary</span>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Standby IP</th>
+                                        <th>App Name</th>
+                                        <th>State</th>
+                                        <th>Sync State</th>
+                                        <th>Lag (MB)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-replica-standby-tbody">
+                                    <tr>
+                                        <td colspan="5" class="text-center">No standby replica servers connected.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Replica Receiver Info -->
+                        <div id="detail-replica-receiver-info" class="settings-card glass" style="padding: 1.25rem; margin-top: 1rem; display: none;">
+                            <h4 style="font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--color-online);">Replica / Recovery State</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div>Last Replay Timestamp: <strong id="detail-replica-last-replay">-</strong></div>
+                                <div>Lag Behind Primary: <strong id="detail-replica-lag-secs">0s</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction ID Wraparound Age -->
+                    <div class="detail-section">
+                        <div class="detail-section-header">
+                            <h4>⚠️ Transaction ID Wraparound Age</h4>
+                        </div>
+                        
+                        <!-- DB Frozen Age -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <h5 style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">Database frozen age (Max progress to 2B limit)</h5>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Database Name</th>
+                                            <th>Frozen XID Age</th>
+                                            <th>Remaining TXIDs</th>
+                                            <th>Wraparound progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detail-txid-db-tbody">
+                                        <tr>
+                                            <td colspan="4" class="text-center">Loading database ages...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Table Frozen Age -->
+                        <div>
+                            <h5 style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">Table frozen age (Top 5 oldest tables)</h5>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Table Name</th>
+                                            <th>Frozen XID Age</th>
+                                            <th>Wraparound progress</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detail-txid-table-tbody">
+                                        <tr>
+                                            <td colspan="3" class="text-center">Loading table ages...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

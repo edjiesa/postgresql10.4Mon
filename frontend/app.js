@@ -338,6 +338,9 @@ async function deleteDatabase(id, name) {
 async function openDetailModal(dbId) {
     activeDetailDbId = dbId;
     
+    // Reset tab to overview
+    switchModalTab('overview');
+    
     // Trigger immediate update
     await fetchDetailMetrics();
     
@@ -485,6 +488,178 @@ async function fetchDetailMetrics() {
             });
         }
         
+        // Render Autovacuum Workers Table
+        const vacuumWorkers = metrics.autovacuum_workers || [];
+        document.getElementById('detail-vacuum-workers-count').innerText = vacuumWorkers.length;
+        document.getElementById('detail-badge-vacuum').innerText = vacuumWorkers.length;
+        const vacWorkersTbody = document.getElementById('detail-vacuum-workers-tbody');
+        if (vacuumWorkers.length === 0) {
+            vacWorkersTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center" style="color:var(--text-muted); padding:1.5rem;">No active autovacuum workers running.</td>
+                </tr>
+            `;
+        } else {
+            vacWorkersTbody.innerHTML = '';
+            vacuumWorkers.forEach(w => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--font-mono); font-weight:600;">${w.pid}</td>
+                    <td><code class="query-text">${escapeHtml(w.query)}</code></td>
+                    <td><span class="status-indicator">${w.state}</span></td>
+                    <td style="font-weight:600; color:var(--color-online);">${w.duration_seconds}s</td>
+                    <td>
+                        <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Worker" onclick="killQuery(${db.id}, ${w.pid}, 'Autovacuum worker')">
+                            ⚡
+                        </button>
+                    </td>
+                `;
+                vacWorkersTbody.appendChild(tr);
+            });
+        }
+
+        // Render Dead Tuples (Tables Needing Vacuum) Table
+        const deadTables = metrics.dead_tuples_tables || [];
+        const deadTbody = document.getElementById('detail-dead-tuples-tbody');
+        if (deadTables.length === 0) {
+            deadTbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center" style="color:var(--text-muted); padding:1.5rem;">No tables stats available.</td>
+                </tr>
+            `;
+        } else {
+            deadTbody.innerHTML = '';
+            deadTables.forEach(t => {
+                const tr = document.createElement('tr');
+                const isHighBloat = t.dead_tuples_ratio > 10 && t.dead_tuples > 1000;
+                const ratioStyle = isHighBloat ? 'color:var(--color-critical); font-weight:700;' : 'font-weight:600;';
+                
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${t.table_name}</td>
+                    <td style="font-family:var(--font-mono);">${t.dead_tuples.toLocaleString()}</td>
+                    <td style="font-family:var(--font-mono); color:var(--text-muted);">${t.live_tuples.toLocaleString()}</td>
+                    <td style="${ratioStyle}">${t.dead_tuples_ratio}%</td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${t.last_vacuum ? new Date(t.last_vacuum).toLocaleString() : 'Never'}</td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${t.last_autovacuum ? new Date(t.last_autovacuum).toLocaleString() : 'Never'}</td>
+                `;
+                deadTbody.appendChild(tr);
+            });
+        }
+
+        // Render Replication Stats Table & Recovery Info
+        const repStats = metrics.replication_stats || { is_replica: false, replica_lag_seconds: 0.0, standby_clients: [] };
+        const standbyTbody = document.getElementById('detail-replica-standby-tbody');
+        const receiverDiv = document.getElementById('detail-replica-receiver-info');
+        const statusLabel = document.getElementById('detail-replica-status-label');
+
+        if (repStats.is_replica) {
+            statusLabel.innerText = "Replica";
+            statusLabel.className = "badge badge-info";
+            standbyTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center" style="color:var(--text-muted); padding:1.5rem;">Database is running in recovery mode (replica). Standby metrics are not applicable.</td>
+                </tr>
+            `;
+            receiverDiv.style.display = 'block';
+            document.getElementById('detail-replica-last-replay').innerText = repStats.last_replay_timestamp ? new Date(repStats.last_replay_timestamp).toLocaleString() : '-';
+            const lagSecs = repStats.replica_lag_seconds;
+            const lagElement = document.getElementById('detail-replica-lag-secs');
+            lagElement.innerText = `${lagSecs}s`;
+            lagElement.style.color = lagSecs > 60 ? 'var(--color-critical)' : 'var(--color-online)';
+            document.getElementById('detail-replica-standby-count').innerText = '0';
+        } else {
+            statusLabel.innerText = "Primary";
+            statusLabel.className = "badge badge-success";
+            receiverDiv.style.display = 'none';
+            const standbys = repStats.standby_clients || [];
+            document.getElementById('detail-replica-standby-count').innerText = standbys.length;
+            if (standbys.length === 0) {
+                standbyTbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center" style="color:var(--text-muted); padding:1.5rem;">No standby replica servers connected.</td>
+                    </tr>
+                `;
+            } else {
+                standbyTbody.innerHTML = '';
+                standbys.forEach(s => {
+                    const tr = document.createElement('tr');
+                    const lagStyle = s.lag_mb > 50 ? 'color:var(--color-critical); font-weight:700;' : 'font-weight:600; color:var(--color-online);';
+                    tr.innerHTML = `
+                        <td style="font-family:var(--font-mono); font-weight:600;">${s.standby_ip}</td>
+                        <td>${s.application_name}</td>
+                        <td><span class="status-indicator">${s.state}</span></td>
+                        <td><span class="status-indicator">${s.sync_state}</span></td>
+                        <td style="${lagStyle}">${s.lag_mb} MB</td>
+                    `;
+                    standbyTbody.appendChild(tr);
+                });
+            }
+        }
+
+        // Render Transaction ID Wraparound Tables
+        const wrapStats = metrics.wraparound_stats || { db_wraparound: [], table_wraparound: [] };
+        
+        const dbXidTbody = document.getElementById('detail-txid-db-tbody');
+        const dbWraps = wrapStats.db_wraparound || [];
+        if (dbWraps.length === 0) {
+            dbXidTbody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center" style="color:var(--text-muted); padding:1rem;">No database stats available.</td>
+                </tr>
+            `;
+        } else {
+            dbXidTbody.innerHTML = '';
+            dbWraps.forEach(d => {
+                const tr = document.createElement('tr');
+                const isHighAge = d.wraparound_percent > 80;
+                const progressColor = isHighAge ? 'var(--color-critical)' : 'var(--color-online)';
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${d.datname}</td>
+                    <td style="font-family:var(--font-mono);">${d.txid_age.toLocaleString()}</td>
+                    <td style="font-family:var(--font-mono); color:var(--text-muted);">${d.txids_remaining.toLocaleString()}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <div class="meter-bar-container" style="height:6px; flex-grow:1; background:rgba(255,255,255,0.05); border-radius:3px;">
+                                <div class="meter-bar-fill ${isHighAge ? 'critical' : ''}" style="width:${d.wraparound_percent}%; height:100%; border-radius:3px;"></div>
+                            </div>
+                            <span style="font-size:0.75rem; font-weight:600; color:${progressColor}; width:45px; text-align:right;">${d.wraparound_percent}%</span>
+                        </div>
+                    </td>
+                `;
+                dbXidTbody.appendChild(tr);
+            });
+        }
+
+        const tableXidTbody = document.getElementById('detail-txid-table-tbody');
+        const tableWraps = wrapStats.table_wraparound || [];
+        if (tableWraps.length === 0) {
+            tableXidTbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="text-center" style="color:var(--text-muted); padding:1rem;">No table stats available.</td>
+                </tr>
+            `;
+        } else {
+            tableXidTbody.innerHTML = '';
+            tableWraps.forEach(t => {
+                const tr = document.createElement('tr');
+                const isHighAge = t.table_wraparound_percent > 80;
+                const progressColor = isHighAge ? 'var(--color-critical)' : 'var(--color-online)';
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${t.table_name}</td>
+                    <td style="font-family:var(--font-mono);">${t.table_age.toLocaleString()}</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <div class="meter-bar-container" style="height:6px; flex-grow:1; background:rgba(255,255,255,0.05); border-radius:3px;">
+                                <div class="meter-bar-fill ${isHighAge ? 'critical' : ''}" style="width:${t.table_wraparound_percent}%; height:100%; border-radius:3px;"></div>
+                            </div>
+                            <span style="font-size:0.75rem; font-weight:600; color:${progressColor}; width:45px; text-align:right;">${t.table_wraparound_percent}%</span>
+                        </div>
+                    </td>
+                `;
+                tableXidTbody.appendChild(tr);
+            });
+        }
+
     } catch (e) {
         console.error(e);
         showToast("Error updating detail metrics: " + e.message, "error");
@@ -699,4 +874,16 @@ function formatBytes(bytes) {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function switchModalTab(tabName) {
+    // Remove active from all tab buttons
+    document.querySelectorAll('.modal-tab-btn').forEach(btn => btn.classList.remove('active'));
+    // Add active to current
+    document.getElementById(`modal-tab-btn-${tabName}`).classList.add('active');
+    
+    // Hide all tab content
+    document.querySelectorAll('.modal-tab-content').forEach(content => content.style.display = 'none');
+    // Show current
+    document.getElementById(`modal-tab-content-${tabName}`).style.display = 'block';
 }

@@ -213,7 +213,18 @@ async def api_get_databases():
                     "slow_queries": [],
                     "active_queries": [],
                     "idle_queries": [],
-                    "blocking_queries": []
+                    "blocking_queries": [],
+                    "autovacuum_workers": [],
+                    "dead_tuples_tables": [],
+                    "wraparound_stats": {
+                        "db_wraparound": [],
+                        "table_wraparound": []
+                    },
+                    "replication_stats": {
+                        "is_replica": False,
+                        "replica_lag_seconds": 0.0,
+                        "standby_clients": []
+                    }
                 }
         return dbs
     except Exception as e:
