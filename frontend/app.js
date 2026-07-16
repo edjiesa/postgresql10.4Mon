@@ -42,7 +42,7 @@ function switchTab(tabName) {
         fetchDatabases();
     } else if (tabName === 'alerts') {
         pageTitle.innerText = "Alert Configuration";
-        pageSubtitle.innerText = "Configure Telegram, Discord, or Slack endpoints for alerts";
+        pageSubtitle.innerText = "Configure Telegram, Discord, Slack, or n8n endpoints for alerts";
         fetchAlertSettings();
     } else if (tabName === 'logs') {
         pageTitle.innerText = "Event Log History";
@@ -496,6 +496,11 @@ async function fetchAlertSettings() {
         document.getElementById('slack-enabled').checked = sc.is_enabled;
         document.getElementById('slack-webhook-url').value = sc.config.webhook_url || '';
         
+        // 4. n8n
+        const n8n = channels.n8n || { config: {}, is_enabled: false };
+        document.getElementById('n8n-enabled').checked = n8n.is_enabled;
+        document.getElementById('n8n-webhook-url').value = n8n.config.webhook_url || '';
+        
     } catch (e) {
         showToast("Error loading alert configs: " + e.message, 'error');
     }
@@ -520,6 +525,11 @@ async function saveAlertChannel(channel) {
         is_enabled = document.getElementById('slack-enabled').checked;
         config = {
             webhook_url: document.getElementById('slack-webhook-url').value
+        };
+    } else if (channel === 'n8n') {
+        is_enabled = document.getElementById('n8n-enabled').checked;
+        config = {
+            webhook_url: document.getElementById('n8n-webhook-url').value
         };
     }
     

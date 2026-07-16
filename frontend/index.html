@@ -131,6 +131,26 @@
                             <button class="btn btn-secondary" onclick="saveAlertChannel('slack')">Save Slack Config</button>
                         </div>
                     </div>
+
+                    <!-- n8n Card -->
+                    <div class="settings-card glass">
+                        <div class="settings-card-header">
+                            <span class="channel-icon">🔗</span>
+                            <h3>n8n Webhook Alert</h3>
+                            <label class="switch">
+                                <input type="checkbox" id="n8n-enabled">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="settings-card-body">
+                            <p class="help-text">Send alert JSON payloads directly to an n8n workflow webhook trigger.</p>
+                            <div class="form-group">
+                                <label for="n8n-webhook-url">Webhook URL</label>
+                                <input type="text" id="n8n-webhook-url" placeholder="https://primary-n8n.domain.com/webhook/... ">
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveAlertChannel('n8n')">Save n8n Config</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

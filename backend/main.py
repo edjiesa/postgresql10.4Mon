@@ -308,7 +308,7 @@ async def api_get_alerts():
 
 @app.put("/api/alerts/{channel}")
 async def api_update_alerts(channel: str, data: AlertSettingsModel):
-    if channel not in ["telegram", "discord", "slack"]:
+    if channel not in ["telegram", "discord", "slack", "n8n"]:
         raise HTTPException(status_code=400, detail="Invalid alert channel.")
         
     try:

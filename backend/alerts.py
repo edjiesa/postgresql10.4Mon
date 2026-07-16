@@ -195,3 +195,21 @@ def trigger_alert(db_id, db_name, alert_type, severity, message, details=None, i
                 "text": mrkdwn_text
             }
             send_webhook_message(webhook_url, slack_payload)
+
+    # D. n8n Webhook
+    n8n = settings.get("n8n")
+    if n8n and n8n.get("is_enabled"):
+        cfg = n8n.get("config", {})
+        webhook_url = cfg.get("webhook_url")
+        if webhook_url:
+            n8n_payload = {
+                "event": "database_performance_alert",
+                "database_id": db_id,
+                "database_name": db_name,
+                "alert_type": alert_type,
+                "severity": severity,
+                "message": message,
+                "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
+                "details": details
+            }
+            send_webhook_message(webhook_url, n8n_payload)
