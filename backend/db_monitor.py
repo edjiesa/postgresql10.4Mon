@@ -6,27 +6,28 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_monitor")
 
-def get_connection_string(db_config):
+def get_connection_params(db_config):
     """
-    Construct connection string from config dictionary.
+    Construct connection parameters dictionary from config.
     """
-    host = db_config.get('host')
-    port = db_config.get('port', 5432)
-    user = db_config.get('username')
-    password = db_config.get('password')
-    dbname = db_config.get('dbname')
-    sslmode = db_config.get('sslmode', 'prefer')
-    
-    return f"host='{host}' port={port} user='{user}' password='{password}' dbname='{dbname}' sslmode='{sslmode}' connect_timeout=5"
+    return {
+        "host": db_config.get('host'),
+        "port": int(db_config.get('port', 5432)),
+        "user": db_config.get('username'),
+        "password": db_config.get('password'),
+        "dbname": db_config.get('dbname'),
+        "sslmode": db_config.get('sslmode', 'prefer'),
+        "connect_timeout": 5
+    }
 
 def test_connection(db_config):
     """
     Test connection to a remote PostgreSQL server.
     Returns (success_boolean, message)
     """
-    conn_str = get_connection_string(db_config)
+    conn_params = get_connection_params(db_config)
     try:
-        with psycopg.connect(conn_str) as conn:
+        with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT version();")
                 version = cur.fetchone()[0]
@@ -40,7 +41,7 @@ def check_db_metrics(db_config):
     Gathers database performance metrics from remote PostgreSQL.
     Returns dictionary with all metrics, or raises an Exception.
     """
-    conn_str = get_connection_string(db_config)
+    conn_params = get_connection_params(db_config)
     metrics = {
         "status": "online",
         "pg_version": "Unknown",
@@ -71,7 +72,7 @@ def check_db_metrics(db_config):
     
     slow_threshold = db_config.get('slow_query_threshold', 5)
     
-    with psycopg.connect(conn_str, row_factory=dict_row) as conn:
+    with psycopg.connect(**conn_params, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             # 1. Version, DB Size, Connections
             try:
@@ -355,9 +356,9 @@ def terminate_query(db_config, pid):
     Terminates a specific query execution by pid.
     Returns (success_boolean, message)
     """
-    conn_str = get_connection_string(db_config)
+    conn_params = get_connection_params(db_config)
     try:
-        with psycopg.connect(conn_str) as conn:
+        with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT pg_terminate_backend(%s);", (pid,))
                 result = cur.fetchone()[0]
