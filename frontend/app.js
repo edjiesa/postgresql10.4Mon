@@ -420,9 +420,14 @@ async function fetchDetailMetrics() {
                     <td><span class="status-indicator">${q.state}</span></td>
                     <td><code class="query-text" title="${escapeHtml(q.query)}">${escapeHtml(q.query)}</code></td>
                     <td>
-                        <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Query" onclick="killQuery(${db.id}, ${q.pid}, '${escapeHtml(q.query)}')">
-                            ⚡
-                        </button>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Query" onclick="killQuery(${db.id}, ${q.pid}, '${escapeHtml(q.query)}')">
+                                ⚡
+                            </button>
+                            <button class="btn btn-text btn-icon-only" style="padding:0.4rem; height:28px; width:28px; border:1px solid var(--color-warning); color:var(--color-warning);" title="Manual Alert" onclick="alertQuery(${db.id}, ${q.pid}, '${escapeHtml(q.username)}', '${escapeHtml(q.state)}', ${q.duration_seconds}, '${escapeHtml(q.client_ip || 'local')}', '${escapeHtml(q.query)}')">
+                                🚨
+                            </button>
+                        </div>
                     </td>
                 `;
                 slowTbody.appendChild(tr);
@@ -452,9 +457,14 @@ async function fetchDetailMetrics() {
                     <td><span class="status-indicator">${q.state}</span></td>
                     <td><code class="query-text" title="${escapeHtml(q.query)}">${escapeHtml(q.query) || 'None'}</code></td>
                     <td>
-                        <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Session" onclick="killQuery(${db.id}, ${q.pid}, 'Idle session')">
-                            ⚡
-                        </button>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-danger btn-icon-only" style="padding:0.4rem; height:28px; width:28px;" title="Kill Session" onclick="killQuery(${db.id}, ${q.pid}, 'Idle session')">
+                                ⚡
+                            </button>
+                            <button class="btn btn-text btn-icon-only" style="padding:0.4rem; height:28px; width:28px; border:1px solid var(--color-warning); color:var(--color-warning);" title="Manual Alert" onclick="alertQuery(${db.id}, ${q.pid}, '${escapeHtml(q.username)}', '${escapeHtml(q.state)}', ${q.duration_seconds}, '${escapeHtml(q.client_ip || 'local')}', '${escapeHtml(q.query)}')">
+                                🚨
+                            </button>
+                        </div>
                     </td>
                 `;
                 idleTbody.appendChild(tr);
@@ -684,6 +694,37 @@ async function killQuery(dbId, pid, querySummary) {
         fetchDetailMetrics();
     } catch (e) {
         showToast("Kill failed: " + e.message, 'error');
+    }
+}
+
+async function alertQuery(dbId, pid, username, state, duration, clientIp, query) {
+    if (!confirm(`Send manual alert for PID ${pid} to all channels?`)) return;
+    
+    const payload = {
+        pid: pid,
+        usename: username || 'unknown',
+        query: query,
+        duration_seconds: parseFloat(duration) || 0.0,
+        state: state || 'unknown',
+        client_addr: clientIp || 'local'
+    };
+    
+    showToast("Sending manual query alert...", "info");
+    try {
+        const response = await fetch(`/api/databases/${dbId}/alert-query`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || "Failed to dispatch alert.");
+        }
+        
+        showToast(`Manual alert for PID ${pid} sent successfully.`, "success");
+    } catch (e) {
+        showToast("Failed to send alert: " + e.message, "error");
     }
 }
 

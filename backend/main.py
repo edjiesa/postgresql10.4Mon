@@ -341,6 +341,33 @@ async def api_kill_query(db_id: int, pid: int):
     asyncio.create_task(check_and_alert_db(db))
     return {"message": message}
 
+class QueryAlertModel(BaseModel):
+    pid: int
+    usename: str = "unknown"
+    query: str
+    duration_seconds: float = 0.0
+    state: str = "unknown"
+    client_addr: str = "unknown"
+
+@app.post("/api/databases/{db_id}/alert-query")
+async def api_alert_query(db_id: int, data: QueryAlertModel):
+    db = config.get_database(db_id)
+    if not db:
+        raise HTTPException(status_code=404, detail="Database not found.")
+        
+    query_details = data.model_dump()
+    await asyncio.to_thread(
+        alerts.trigger_alert,
+        db_id=db_id,
+        db_name=db["name"],
+        alert_type="manual_query",
+        severity="warning",
+        message=f"Administrator manually alerted a query with PID {data.pid}.",
+        details=query_details,
+        item_key=f"manual_alert_{data.pid}_{time.time()}"
+    )
+    return {"message": "Manual query alert sent successfully."}
+
 @app.get("/api/alerts")
 async def api_get_alerts():
     try:

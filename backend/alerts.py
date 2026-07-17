@@ -155,6 +155,17 @@ def trigger_alert(db_id, db_name, alert_type, severity, message, details=None, i
                     f"• Delay: {details.get('replica_lag_seconds')} seconds\n"
                     f"• Last Replay: {details.get('last_replay_timestamp')}"
                 )
+        elif alert_type == "manual_query":
+            text_message += (
+                f"\n\n<b>Details (Manual Alert):</b>\n"
+                f"• PID: {details.get('pid')}\n"
+                f"• User: {details.get('usename')}\n"
+                f"• State: {details.get('state')}\n"
+                f"• Duration: {details.get('duration_seconds')} seconds\n"
+                f"• Client IP: {details.get('client_addr')}\n"
+                f"• Query: <code>{details.get('query', '')[:300]}...</code>"
+            )
+
 
     # Dispatch alerts
     # A. Telegram
