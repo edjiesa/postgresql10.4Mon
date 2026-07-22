@@ -72,7 +72,7 @@ def check_db_metrics(db_config):
     
     slow_threshold = db_config.get('slow_query_threshold', 5)
     
-    with psycopg.connect(**conn_params, row_factory=dict_row) as conn:
+    with psycopg.connect(**conn_params, row_factory=dict_row, autocommit=True) as conn:
         with conn.cursor() as cur:
             # 1. Version, DB Size, Connections
             try:
@@ -114,7 +114,7 @@ def check_db_metrics(db_config):
                     SELECT 
                         CASE 
                             WHEN COALESCE(sum(blks_hit), 0) + COALESCE(sum(blks_read), 0) = 0 THEN 0.0
-                            ELSE round((COALESCE(sum(blks_hit), 0)::float / (COALESCE(sum(blks_hit), 0) + COALESCE(sum(blks_read), 0))::float) * 100, 2)
+                            ELSE round(((COALESCE(sum(blks_hit), 0)::numeric / (COALESCE(sum(blks_hit), 0) + COALESCE(sum(blks_read), 0))::numeric) * 100.0), 2)
                         END AS cache_hit_ratio
                     FROM pg_stat_database;
                 """)
@@ -130,7 +130,7 @@ def check_db_metrics(db_config):
                     SELECT 
                         CASE 
                             WHEN COALESCE(sum(idx_blks_hit), 0) + COALESCE(sum(idx_blks_read), 0) = 0 THEN 0.0
-                            ELSE round((COALESCE(sum(idx_blks_hit), 0)::float / (COALESCE(sum(idx_blks_hit), 0) + COALESCE(sum(idx_blks_read), 0))::float) * 100, 2)
+                            ELSE round(((COALESCE(sum(idx_blks_hit), 0)::numeric / (COALESCE(sum(idx_blks_hit), 0) + COALESCE(sum(idx_blks_read), 0))::numeric) * 100.0), 2)
                         END AS index_hit_ratio
                     FROM pg_statio_all_indexes;
                 """)
@@ -279,7 +279,7 @@ def check_db_metrics(db_config):
                         schemaname || '.' || relname AS table_name,
                         n_dead_tup AS dead_tuples,
                         n_live_tup AS live_tuples,
-                        round((n_dead_tup::float / COALESCE(NULLIF(n_dead_tup + n_live_tup, 0), 1)::float) * 100, 2) AS dead_tuples_ratio,
+                        round(((n_dead_tup::numeric / NULLIF(n_dead_tup + n_live_tup, 0)::numeric) * 100.0), 2) AS dead_tuples_ratio,
                         last_vacuum,
                         last_autovacuum,
                         last_analyze,
@@ -307,7 +307,7 @@ def check_db_metrics(db_config):
                         datname,
                         age(datfrozenxid) AS txid_age,
                         2147483648 - age(datfrozenxid) AS txids_remaining,
-                        round((age(datfrozenxid)::float / 2147483648::float) * 100, 2) AS wraparound_percent
+                        round(((age(datfrozenxid)::numeric / 2147483648::numeric) * 100.0), 2) AS wraparound_percent
                     FROM pg_database
                     WHERE datallowconn
                     ORDER BY txid_age DESC;
@@ -319,7 +319,7 @@ def check_db_metrics(db_config):
                     SELECT 
                         c.oid::regclass::text AS table_name,
                         age(c.relfrozenxid) AS table_age,
-                        round((age(c.relfrozenxid)::float / 2147483648::float) * 100, 2) AS table_wraparound_percent
+                        round(((age(c.relfrozenxid)::numeric / 2147483648::numeric) * 100.0), 2) AS table_wraparound_percent
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE c.relkind = 'r'
@@ -359,7 +359,7 @@ def check_db_metrics(db_config):
                             application_name,
                             state,
                             sync_state,
-                            round(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) / 1024 / 1024, 2) AS lag_mb
+                            round((pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) / 1024 / 1024)::numeric, 2) AS lag_mb
                         FROM pg_stat_replication;
                     """)
                     standby_rows = cur.fetchall()
