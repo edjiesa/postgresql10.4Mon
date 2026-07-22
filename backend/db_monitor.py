@@ -74,6 +74,16 @@ def check_db_metrics(db_config):
     
     with psycopg.connect(**conn_params, row_factory=dict_row, autocommit=True) as conn:
         with conn.cursor() as cur:
+            # Detect numeric PostgreSQL version (e.g. 90113 for 9.1.13, 100004 for 10.4)
+            pg_version_num = 100000
+            try:
+                cur.execute("SELECT current_setting('server_version_num')::int;")
+                v_row = cur.fetchone()
+                if v_row:
+                    pg_version_num = list(v_row.values())[0] or 100000
+            except Exception:
+                pg_version_num = 100000
+
             # 1. Version, DB Size, Connections
             try:
                 cur.execute("""
@@ -92,19 +102,20 @@ def check_db_metrics(db_config):
             except Exception as e:
                 logger.warning(f"Error querying connection stats: {e}")
 
-            # 1b. Temp files and bytes
+            # 1b. Temp files and bytes (temp_files added in PG 9.2)
             try:
-                cur.execute("""
-                    SELECT 
-                        COALESCE(sum(temp_files), 0) AS temp_files,
-                        COALESCE(sum(temp_bytes), 0) AS temp_bytes
-                    FROM pg_stat_database
-                    WHERE datname = current_database();
-                """)
-                row = cur.fetchone()
-                if row:
-                    metrics["temp_files"] = int(row.get("temp_files", 0))
-                    metrics["temp_bytes"] = int(row.get("temp_bytes", 0))
+                if pg_version_num >= 90200:
+                    cur.execute("""
+                        SELECT 
+                            COALESCE(sum(temp_files), 0) AS temp_files,
+                            COALESCE(sum(temp_bytes), 0) AS temp_bytes
+                        FROM pg_stat_database
+                        WHERE datname = current_database();
+                    """)
+                    row = cur.fetchone()
+                    if row:
+                        metrics["temp_files"] = int(row.get("temp_files", 0))
+                        metrics["temp_bytes"] = int(row.get("temp_bytes", 0))
             except Exception as e:
                 logger.warning(f"Error querying database temp files: {e}")
 
@@ -142,26 +153,70 @@ def check_db_metrics(db_config):
 
             # 4. Slow Queries
             try:
-                cur.execute("""
-                    SELECT 
-                        pid,
-                        usename AS username,
-                        client_addr AS client_ip,
-                        backend_start,
-                        query_start,
-                        state,
-                        wait_event_type,
-                        wait_event,
-                        query,
-                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
-                    FROM pg_stat_activity
-                    WHERE state != 'idle'
-                      AND pid != pg_backend_pid()
-                      AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
-                      AND query_start IS NOT NULL
-                      AND (clock_timestamp() - query_start) > (%s * interval '1 second')
-                    ORDER BY duration_seconds DESC;
-                """, (slow_threshold,))
+                if pg_version_num < 90200:
+                    cur.execute("""
+                        SELECT 
+                            procpid AS pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            'active' AS state,
+                            '' AS wait_event_type,
+                            '' AS wait_event,
+                            current_query AS query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS duration_seconds
+                        FROM pg_stat_activity
+                        WHERE current_query NOT LIKE '<IDLE>%%'
+                          AND current_query != '<IDLE>'
+                          AND procpid != pg_backend_pid()
+                          AND (current_query IS NULL OR current_query NOT LIKE '%%pg_stat_activity%%')
+                          AND query_start IS NOT NULL
+                          AND (clock_timestamp() - query_start) > (%s * interval '1 second')
+                        ORDER BY duration_seconds DESC;
+                    """, (slow_threshold,))
+                elif pg_version_num < 90600:
+                    cur.execute("""
+                        SELECT 
+                            pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            state,
+                            '' AS wait_event_type,
+                            '' AS wait_event,
+                            query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS duration_seconds
+                        FROM pg_stat_activity
+                        WHERE state != 'idle'
+                          AND pid != pg_backend_pid()
+                          AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
+                          AND query_start IS NOT NULL
+                          AND (clock_timestamp() - query_start) > (%s * interval '1 second')
+                        ORDER BY duration_seconds DESC;
+                    """, (slow_threshold,))
+                else:
+                    cur.execute("""
+                        SELECT 
+                            pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            state,
+                            wait_event_type,
+                            wait_event,
+                            query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS duration_seconds
+                        FROM pg_stat_activity
+                        WHERE state != 'idle'
+                          AND pid != pg_backend_pid()
+                          AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
+                          AND query_start IS NOT NULL
+                          AND (clock_timestamp() - query_start) > (%s * interval '1 second')
+                        ORDER BY duration_seconds DESC;
+                    """, (slow_threshold,))
                 rows = cur.fetchall()
                 slow_list = []
                 for r in rows:
@@ -174,25 +229,70 @@ def check_db_metrics(db_config):
 
             # 4b. All Active and Idle Sessions
             try:
-                cur.execute("""
-                    SELECT 
-                        pid,
-                        usename AS username,
-                        client_addr AS client_ip,
-                        backend_start,
-                        query_start,
-                        state_change,
-                        state,
-                        wait_event_type,
-                        wait_event,
-                        query,
-                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS query_duration_seconds,
-                        round(extract(epoch from (clock_timestamp() - state_change))::numeric, 2) AS idle_duration_seconds
-                    FROM pg_stat_activity
-                    WHERE pid != pg_backend_pid()
-                      AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
-                    ORDER BY COALESCE(query_start, state_change) DESC;
-                """)
+                if pg_version_num < 90200:
+                    cur.execute("""
+                        SELECT 
+                            procpid AS pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            query_start AS state_change,
+                            CASE 
+                                WHEN current_query = '<IDLE>' THEN 'idle'
+                                WHEN current_query LIKE '<IDLE>%%' THEN substring(current_query from 2 for position('>' in current_query)-2)
+                                ELSE 'active'
+                            END AS state,
+                            '' AS wait_event_type,
+                            '' AS wait_event,
+                            current_query AS query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS query_duration_seconds,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS idle_duration_seconds
+                        FROM pg_stat_activity
+                        WHERE procpid != pg_backend_pid()
+                          AND (current_query IS NULL OR current_query NOT LIKE '%%pg_stat_activity%%')
+                        ORDER BY query_start DESC;
+                    """)
+                elif pg_version_num < 90600:
+                    cur.execute("""
+                        SELECT 
+                            pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            state_change,
+                            state,
+                            '' AS wait_event_type,
+                            '' AS wait_event,
+                            query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS query_duration_seconds,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - state_change))::numeric, 2), 0.0) AS idle_duration_seconds
+                        FROM pg_stat_activity
+                        WHERE pid != pg_backend_pid()
+                          AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
+                        ORDER BY COALESCE(query_start, state_change) DESC;
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT 
+                            pid,
+                            usename AS username,
+                            client_addr::text AS client_ip,
+                            backend_start,
+                            query_start,
+                            state_change,
+                            state,
+                            wait_event_type,
+                            wait_event,
+                            query,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS query_duration_seconds,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - state_change))::numeric, 2), 0.0) AS idle_duration_seconds
+                        FROM pg_stat_activity
+                        WHERE pid != pg_backend_pid()
+                          AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
+                        ORDER BY COALESCE(query_start, state_change) DESC;
+                    """)
                 rows = cur.fetchall()
                 active_list = []
                 idle_list = []
@@ -214,32 +314,60 @@ def check_db_metrics(db_config):
 
             # 5. Blocking Locks
             try:
-                cur.execute("""
-                    SELECT
-                        blocked_locks.pid     AS blocked_pid,
-                        blocked_activity.usename  AS blocked_user,
-                        blocked_activity.query    AS blocked_statement,
-                        blocking_locks.pid    AS blocking_pid,
-                        blocking_activity.usename AS blocking_user,
-                        blocking_activity.query   AS blocking_statement,
-                        round(extract(epoch from (clock_timestamp() - blocked_activity.query_start))::numeric, 2) AS blocked_duration_seconds
-                    FROM pg_catalog.pg_locks         blocked_locks
-                    JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.pid = blocked_locks.pid
-                    JOIN pg_catalog.pg_locks         blocking_locks 
-                        ON blocking_locks.locktype = blocked_locks.locktype
-                        AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
-                        AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
-                        AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
-                        AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
-                        AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
-                        AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
-                        AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
-                        AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
-                        AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
-                        AND blocking_locks.pid != blocked_locks.pid
-                    JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
-                    WHERE NOT blocked_locks.granted;
-                """)
+                if pg_version_num < 90200:
+                    cur.execute("""
+                        SELECT
+                            blocked_locks.procpid     AS blocked_pid,
+                            blocked_activity.usename  AS blocked_user,
+                            blocked_activity.current_query    AS blocked_statement,
+                            blocking_locks.procpid    AS blocking_pid,
+                            blocking_activity.usename AS blocking_user,
+                            blocking_activity.current_query   AS blocking_statement,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - blocked_activity.query_start))::numeric, 2), 0.0) AS blocked_duration_seconds
+                        FROM pg_catalog.pg_locks         blocked_locks
+                        JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.procpid = blocked_locks.procpid
+                        JOIN pg_catalog.pg_locks         blocking_locks 
+                            ON blocking_locks.locktype = blocked_locks.locktype
+                            AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+                            AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+                            AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+                            AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+                            AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+                            AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+                            AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+                            AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+                            AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+                            AND blocking_locks.procpid != blocked_locks.procpid
+                        JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.procpid = blocking_locks.procpid
+                        WHERE NOT blocked_locks.granted;
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT
+                            blocked_locks.pid     AS blocked_pid,
+                            blocked_activity.usename  AS blocked_user,
+                            blocked_activity.query    AS blocked_statement,
+                            blocking_locks.pid    AS blocking_pid,
+                            blocking_activity.usename AS blocking_user,
+                            blocking_activity.query   AS blocking_statement,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - blocked_activity.query_start))::numeric, 2), 0.0) AS blocked_duration_seconds
+                        FROM pg_catalog.pg_locks         blocked_locks
+                        JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.pid = blocked_locks.pid
+                        JOIN pg_catalog.pg_locks         blocking_locks 
+                            ON blocking_locks.locktype = blocked_locks.locktype
+                            AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+                            AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+                            AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+                            AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+                            AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+                            AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+                            AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+                            AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+                            AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+                            AND blocking_locks.pid != blocked_locks.pid
+                        JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
+                        WHERE NOT blocked_locks.granted;
+                    """)
                 rows = cur.fetchall()
                 lock_list = []
                 for r in rows:
@@ -252,16 +380,28 @@ def check_db_metrics(db_config):
 
             # 6. Autovacuum Workers
             try:
-                cur.execute("""
-                    SELECT 
-                        pid,
-                        query,
-                        state,
-                        round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
-                    FROM pg_stat_activity
-                    WHERE query LIKE 'autovacuum%%' 
-                      AND pid != pg_backend_pid();
-                """)
+                if pg_version_num < 90200:
+                    cur.execute("""
+                        SELECT 
+                            procpid AS pid,
+                            current_query AS query,
+                            'active' AS state,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS duration_seconds
+                        FROM pg_stat_activity
+                        WHERE current_query LIKE 'autovacuum%%' 
+                          AND procpid != pg_backend_pid();
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT 
+                            pid,
+                            query,
+                            state,
+                            COALESCE(round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2), 0.0) AS duration_seconds
+                        FROM pg_stat_activity
+                        WHERE query LIKE 'autovacuum%%' 
+                          AND pid != pg_backend_pid();
+                    """)
                 rows = cur.fetchall()
                 vacuum_list = []
                 for r in rows:
@@ -339,13 +479,22 @@ def check_db_metrics(db_config):
                 
                 if is_recovery and is_recovery.get("pg_is_in_recovery"):
                     metrics["replication_stats"]["is_replica"] = True
-                    cur.execute("""
-                        SELECT 
-                            pg_last_wal_receive_lsn()::text AS last_receive_lsn,
-                            pg_last_wal_replay_lsn()::text AS last_replay_lsn,
-                            pg_last_xact_replay_timestamp() AS last_replay_timestamp,
-                            round(extract(epoch from (now() - pg_last_xact_replay_timestamp()))::numeric, 2) AS replication_lag_seconds;
-                    """)
+                    if pg_version_num < 100000:
+                        cur.execute("""
+                            SELECT 
+                                pg_last_xlog_receive_location()::text AS last_receive_lsn,
+                                pg_last_xlog_replay_location()::text AS last_replay_lsn,
+                                pg_last_xact_replay_timestamp() AS last_replay_timestamp,
+                                COALESCE(round(extract(epoch from (now() - pg_last_xact_replay_timestamp()))::numeric, 2), 0.0) AS replication_lag_seconds;
+                        """)
+                    else:
+                        cur.execute("""
+                            SELECT 
+                                pg_last_wal_receive_lsn()::text AS last_receive_lsn,
+                                pg_last_wal_replay_lsn()::text AS last_replay_lsn,
+                                pg_last_xact_replay_timestamp() AS last_replay_timestamp,
+                                COALESCE(round(extract(epoch from (now() - pg_last_xact_replay_timestamp()))::numeric, 2), 0.0) AS replication_lag_seconds;
+                        """)
                     rep_row = cur.fetchone()
                     if rep_row:
                         metrics["replication_stats"]["replica_lag_seconds"] = float(rep_row.get("replication_lag_seconds") or 0.0)
@@ -353,15 +502,26 @@ def check_db_metrics(db_config):
                             metrics["replication_stats"]["last_replay_timestamp"] = rep_row.get("last_replay_timestamp").isoformat() if hasattr(rep_row.get("last_replay_timestamp"), "isoformat") else str(rep_row.get("last_replay_timestamp"))
                 else:
                     metrics["replication_stats"]["is_replica"] = False
-                    cur.execute("""
-                        SELECT 
-                            client_addr::text AS standby_ip,
-                            application_name,
-                            state,
-                            sync_state,
-                            round((pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) / 1024 / 1024)::numeric, 2) AS lag_mb
-                        FROM pg_stat_replication;
-                    """)
+                    if pg_version_num < 100000:
+                        cur.execute("""
+                            SELECT 
+                                client_addr::text AS standby_ip,
+                                application_name,
+                                state,
+                                sync_state,
+                                COALESCE(round((pg_xlog_location_diff(pg_current_xlog_location(), replay_location) / 1024 / 1024)::numeric, 2), 0.0) AS lag_mb
+                            FROM pg_stat_replication;
+                        """)
+                    else:
+                        cur.execute("""
+                            SELECT 
+                                client_addr::text AS standby_ip,
+                                application_name,
+                                state,
+                                sync_state,
+                                COALESCE(round((pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) / 1024 / 1024)::numeric, 2), 0.0) AS lag_mb
+                            FROM pg_stat_replication;
+                        """)
                     standby_rows = cur.fetchall()
                     standby_list = []
                     for r in standby_rows:
