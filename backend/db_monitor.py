@@ -307,6 +307,8 @@ def check_db_metrics(db_config):
                     else:
                         d["duration_seconds"] = float(d.get("idle_duration_seconds") or 0.0)
                         idle_list.append(d)
+                active_list.sort(key=lambda x: x.get("duration_seconds", 0.0), reverse=True)
+                idle_list.sort(key=lambda x: x.get("duration_seconds", 0.0), reverse=True)
                 metrics["active_queries"] = active_list
                 metrics["idle_queries"] = idle_list
             except Exception as e:

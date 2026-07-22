@@ -393,8 +393,8 @@ async function fetchDetailMetrics() {
         
 
         
-        // Render Active Queries Table (showing all running queries)
-        const activeQueries = metrics.active_queries || [];
+        // Render Active Queries Table (showing all running queries, sorted by duration DESC)
+        const activeQueries = (metrics.active_queries || []).slice().sort((a, b) => (parseFloat(b.duration_seconds) || 0) - (parseFloat(a.duration_seconds) || 0));
         document.getElementById('detail-slow-count').innerText = activeQueries.length;
         const slowTbody = document.getElementById('detail-slow-tbody');
         
@@ -434,8 +434,8 @@ async function fetchDetailMetrics() {
             });
         }
         
-        // Render Idle & In-Transaction Queries Table
-        const idleQueries = metrics.idle_queries || [];
+        // Render Idle & In-Transaction Queries Table (sorted by duration DESC)
+        const idleQueries = (metrics.idle_queries || []).slice().sort((a, b) => (parseFloat(b.duration_seconds) || 0) - (parseFloat(a.duration_seconds) || 0));
         document.getElementById('detail-idle-count').innerText = idleQueries.length;
         const idleTbody = document.getElementById('detail-idle-tbody');
         
