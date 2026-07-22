@@ -161,7 +161,12 @@ def check_db_metrics(db_config):
                     ORDER BY duration_seconds DESC;
                 """, (slow_threshold,))
                 rows = cur.fetchall()
-                metrics["slow_queries"] = [dict(r) for r in rows]
+                slow_list = []
+                for r in rows:
+                    d = dict(r)
+                    d["duration_seconds"] = float(d.get("duration_seconds") or 0.0)
+                    slow_list.append(d)
+                metrics["slow_queries"] = slow_list
             except Exception as e:
                 logger.warning(f"Error querying slow queries: {e}")
 
@@ -233,7 +238,12 @@ def check_db_metrics(db_config):
                     WHERE NOT blocked_locks.granted;
                 """)
                 rows = cur.fetchall()
-                metrics["blocking_queries"] = [dict(r) for r in rows]
+                lock_list = []
+                for r in rows:
+                    d = dict(r)
+                    d["blocked_duration_seconds"] = float(d.get("blocked_duration_seconds") or 0.0)
+                    lock_list.append(d)
+                metrics["blocking_queries"] = lock_list
             except Exception as e:
                 logger.warning(f"Error querying blocking locks: {e}")
 
@@ -250,7 +260,12 @@ def check_db_metrics(db_config):
                       AND pid != pg_backend_pid();
                 """)
                 rows = cur.fetchall()
-                metrics["autovacuum_workers"] = [dict(r) for r in rows]
+                vacuum_list = []
+                for r in rows:
+                    d = dict(r)
+                    d["duration_seconds"] = float(d.get("duration_seconds") or 0.0)
+                    vacuum_list.append(d)
+                metrics["autovacuum_workers"] = vacuum_list
             except Exception as e:
                 logger.warning(f"Error querying autovacuum workers: {e}")
 
@@ -345,7 +360,12 @@ def check_db_metrics(db_config):
                         FROM pg_stat_replication;
                     """)
                     standby_rows = cur.fetchall()
-                    metrics["replication_stats"]["standby_clients"] = [dict(r) for r in standby_rows]
+                    standby_list = []
+                    for r in standby_rows:
+                        d = dict(r)
+                        d["lag_mb"] = float(d.get("lag_mb") or 0.0)
+                        standby_list.append(d)
+                    metrics["replication_stats"]["standby_clients"] = standby_list
             except Exception as e:
                 logger.warning(f"Error querying replication lag: {e}")
 

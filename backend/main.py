@@ -36,10 +36,10 @@ async def check_and_alert_db(db):
         DB_METRICS_CACHE[db_id] = metrics
         
         # Analyze and alert
-        active_conn = metrics["active_connections"]
-        max_conn = metrics["max_connections"]
+        active_conn = metrics.get("active_connections") or 0
+        max_conn = metrics.get("max_connections") or 0
         usage_pct = int(active_conn / max_conn * 100) if max_conn > 0 else 0
-        conn_threshold = db.get("max_conn_threshold", 80)
+        conn_threshold = db.get("max_conn_threshold") or 80
         
         # 1. Active Connections Alert
         if usage_pct >= conn_threshold:
@@ -55,9 +55,9 @@ async def check_and_alert_db(db):
             )
             
         # 2. Slow Queries Alert
-        for q in metrics["slow_queries"]:
-            pid = q["pid"]
-            duration = q["duration_seconds"]
+        for q in metrics.get("slow_queries", []):
+            pid = q.get("pid")
+            duration = q.get("duration_seconds") or 0.0
             alerts.trigger_alert(
                 db_id=db_id,
                 db_name=db_name,
@@ -69,9 +69,9 @@ async def check_and_alert_db(db):
             )
             
         # 3. Blocking Lock Alerts
-        for lock in metrics["blocking_queries"]:
-            blocked_pid = lock["blocked_pid"]
-            blocking_pid = lock["blocking_pid"]
+        for lock in metrics.get("blocking_queries", []):
+            blocked_pid = lock.get("blocked_pid")
+            blocking_pid = lock.get("blocking_pid")
             alerts.trigger_alert(
                 db_id=db_id,
                 db_name=db_name,
@@ -84,9 +84,10 @@ async def check_and_alert_db(db):
             
         # 4. Replication Lag Alerts
         rep_stats = metrics.get("replication_stats")
-        if rep_stats:
+        if rep_stats and isinstance(rep_stats, dict):
             if rep_stats.get("is_replica"):
-                lag_seconds = rep_stats.get("replica_lag_seconds", 0.0)
+                lag_seconds_raw = rep_stats.get("replica_lag_seconds")
+                lag_seconds = float(lag_seconds_raw or 0.0)
                 if lag_seconds > 60:
                     alerts.trigger_alert(
                         db_id=db_id,
@@ -99,7 +100,10 @@ async def check_and_alert_db(db):
                     )
             else:
                 for client in rep_stats.get("standby_clients", []):
-                    lag_mb = client.get("lag_mb", 0.0)
+                    if not isinstance(client, dict):
+                        continue
+                    lag_mb_raw = client.get("lag_mb")
+                    lag_mb = float(lag_mb_raw or 0.0)
                     standby_ip = client.get("standby_ip") or "unknown"
                     if lag_mb > 50.0:
                         alerts.trigger_alert(
@@ -153,7 +157,7 @@ async def monitor_scheduler():
                     continue
                 
                 db_id = db["id"]
-                check_interval = db.get("check_interval", 30)
+                check_interval = db.get("check_interval") or 30
                 now = time.time()
                 
                 # Check if database is due for polling
