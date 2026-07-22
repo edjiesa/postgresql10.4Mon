@@ -113,8 +113,8 @@ def check_db_metrics(db_config):
                 cur.execute("""
                     SELECT 
                         CASE 
-                            WHEN sum(blks_hit) + sum(blks_read) = 0 THEN 0.0
-                            ELSE round((sum(blks_hit)::float / (sum(blks_hit) + sum(blks_read))::float) * 100, 2)
+                            WHEN COALESCE(sum(blks_hit), 0) + COALESCE(sum(blks_read), 0) = 0 THEN 0.0
+                            ELSE round((COALESCE(sum(blks_hit), 0)::float / (COALESCE(sum(blks_hit), 0) + COALESCE(sum(blks_read), 0))::float) * 100, 2)
                         END AS cache_hit_ratio
                     FROM pg_stat_database;
                 """)
@@ -129,8 +129,8 @@ def check_db_metrics(db_config):
                 cur.execute("""
                     SELECT 
                         CASE 
-                            WHEN sum(idx_blks_hit) + sum(idx_blks_read) = 0 THEN 0.0
-                            ELSE round((sum(idx_blks_hit)::float / (sum(idx_blks_hit) + sum(idx_blks_read))::float) * 100, 2)
+                            WHEN COALESCE(sum(idx_blks_hit), 0) + COALESCE(sum(idx_blks_read), 0) = 0 THEN 0.0
+                            ELSE round((COALESCE(sum(idx_blks_hit), 0)::float / (COALESCE(sum(idx_blks_hit), 0) + COALESCE(sum(idx_blks_read), 0))::float) * 100, 2)
                         END AS index_hit_ratio
                     FROM pg_statio_all_indexes;
                 """)
@@ -156,7 +156,9 @@ def check_db_metrics(db_config):
                         round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS duration_seconds
                     FROM pg_stat_activity
                     WHERE state != 'idle'
-                      AND query NOT LIKE '%%pg_stat_activity%%'
+                      AND pid != pg_backend_pid()
+                      AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
+                      AND query_start IS NOT NULL
                       AND (clock_timestamp() - query_start) > (%s * interval '1 second')
                     ORDER BY duration_seconds DESC;
                 """, (slow_threshold,))
@@ -187,7 +189,8 @@ def check_db_metrics(db_config):
                         round(extract(epoch from (clock_timestamp() - query_start))::numeric, 2) AS query_duration_seconds,
                         round(extract(epoch from (clock_timestamp() - state_change))::numeric, 2) AS idle_duration_seconds
                     FROM pg_stat_activity
-                    WHERE query NOT LIKE '%%pg_stat_activity%%'
+                    WHERE pid != pg_backend_pid()
+                      AND (query IS NULL OR query NOT LIKE '%%pg_stat_activity%%')
                     ORDER BY COALESCE(query_start, state_change) DESC;
                 """)
                 rows = cur.fetchall()
